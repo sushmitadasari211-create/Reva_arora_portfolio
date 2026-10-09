@@ -1,0 +1,671 @@
+<!--
+LinkedIn Caption:
+Most recruiting teams know how many candidates entered the funnel this quarter.
+Almost none know exactly where qualified candidates are lost, why they are lost,
+and what to fix first.
+
+I built SignalChain — a Recruiting Funnel Loss Analyzer that runs entirely in the browser.
+Pick a hiring scenario and it identifies the single worst stage-to-stage leak against an
+industry benchmark, scores a likely root cause with a severity + confidence rating, ranks
+three concrete interventions by candidates recovered, and generates an executive-ready
+decision summary — not just another funnel dashboard.
+
+4 real hiring scenarios. A benchmark-driven bottleneck detector. A live intervention ROI
+comparison. Built with zero backend. Try switching scenarios and watch the diagnosis change.
+
+#TalentAcquisition #RecruitingOps #HRAnalytics #PeopleAnalytics #SolutionsEngineering
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignalChain — Recruiting Funnel Loss Analyzer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{ink:'#0a0e17',panel:'#141a29',line:'#1f2937',accent:'#22d3ee'}}}}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<style>
+  /* base page styling */
+  body{background:#0a0e17;color:#e2e8f0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:#141a29}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+
+  /* scenario cards */
+  .scenario-card{border:1px solid #1f2937;transition:all .18s ease;cursor:pointer}
+  .scenario-card:hover{border-color:#22d3ee;transform:translateY(-2px)}
+  .scenario-card.active{border-color:#22d3ee;background:#0d2129}
+
+  /* workflow step pills */
+  .step-pill{display:flex;align-items:center;gap:.5rem;padding:.5rem .9rem;border-radius:999px;font-size:.78rem;font-weight:600;color:#64748b;background:#141a29;border:1px solid #1f2937;cursor:pointer;white-space:nowrap}
+  .step-pill.active{color:#0a0e17;background:#22d3ee;border-color:#22d3ee}
+  .step-pill.done{color:#22d3ee;border-color:#22d3ee}
+  .step-panel{display:none}
+  .step-panel.active{display:block;animation:fadein .25s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  /* secondary bottom tabs */
+  .tab-btn{padding:.5rem 1rem;border-radius:.5rem;font-size:.82rem;font-weight:600;color:#94a3b8;cursor:pointer;border:none;background:transparent}
+  .tab-btn.active{background:#0a0e17;color:#22d3ee}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+  pre[class*=language-]{margin:0;border-radius:.5rem;font-size:.78rem;max-height:480px;overflow:auto}
+
+  /* funnel step-ladder graphic */
+  .funnel-bar{height:100%;background:linear-gradient(90deg,#22d3ee,#0891b2);border-radius:.35rem;transition:width .4s ease}
+
+  /* risk heatmap */
+  .risk-red{background:#450a0a;color:#fca5a5}
+  .risk-amber{background:#422006;color:#fde047}
+  .risk-green{background:#052e1a;color:#86efac}
+
+  /* mini bars for conversion */
+  .conv-bar{height:8px;border-radius:4px;background:#1f2937;overflow:hidden}
+  .conv-fill{height:100%;background:#22d3ee}
+
+  /* carousel slides */
+  .slide-card{aspect-ratio:1/1;background:linear-gradient(155deg,#141a29,#0a0e17);border:1px solid #1f2937;border-radius:1rem;padding:1.5rem;display:flex;flex-direction:column;justify-content:space-between}
+
+  .badge{font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ Sticky Navbar ══════════════ -->
+<nav class="sticky top-0 z-50 bg-[#080b13] border-b border-line px-5 py-3 flex items-center gap-4">
+  <span class="text-accent font-bold text-base whitespace-nowrap">SignalChain</span>
+  <span class="flex-1 text-slate-400 italic text-sm text-center hidden md:block">Recruiting Funnel Loss Analyzer</span>
+  <div class="flex gap-4 text-sm whitespace-nowrap">
+    <a href="#" class="text-slate-400 hover:text-white">GitHub</a>
+    <a href="index.html" class="text-accent hover:underline">View Portfolio</a>
+  </div>
+</nav>
+
+<div class="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- ══════════════ Hero ══════════════ -->
+  <section class="space-y-5">
+    <div class="max-w-3xl">
+      <h1 class="text-2xl md:text-4xl font-extrabold text-white leading-tight">Find where great candidates are disappearing.</h1>
+      <p class="text-slate-400 text-sm md:text-base mt-3">Most recruiting teams know how many candidates entered the funnel. Very few know where qualified candidates are lost, why they are lost, and what to fix first.</p>
+    </div>
+
+    <div id="top-leak-banner" class="bg-[#0d2129] border border-accent rounded-xl px-4 py-3 flex flex-wrap items-center gap-2 text-sm"></div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-panel border border-line rounded-xl p-4">
+        <div class="text-slate-500 text-xs uppercase tracking-wide">Funnel Conversion Rate</div>
+        <div id="stat-conversion" class="text-3xl font-extrabold text-white mt-1">—</div>
+      </div>
+      <div class="bg-panel border border-line rounded-xl p-4">
+        <div class="text-slate-500 text-xs uppercase tracking-wide">Candidate Drop-off Rate</div>
+        <div id="stat-dropoff" class="text-3xl font-extrabold text-white mt-1">—</div>
+      </div>
+      <div class="bg-panel border border-line rounded-xl p-4">
+        <div class="text-slate-500 text-xs uppercase tracking-wide">Estimated Recoverable Candidates</div>
+        <div id="stat-recoverable" class="text-3xl font-extrabold text-accent mt-1">—</div>
+      </div>
+    </div>
+
+    <div class="bg-panel border border-line rounded-xl p-5">
+      <h3 class="text-xs uppercase text-slate-400 font-semibold mb-3">Funnel Step Ladder</h3>
+      <div id="funnel-ladder" class="space-y-2"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════ Scenario Switcher ══════════════ -->
+  <section class="space-y-3">
+    <h2 class="text-xs uppercase text-slate-400 font-semibold">Select a Hiring Scenario</h2>
+    <div id="scenario-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+  </section>
+
+  <!-- ══════════════ 4-Part Workflow ══════════════ -->
+  <section class="space-y-4">
+    <div class="flex flex-wrap gap-2 items-center bg-panel border border-line rounded-xl p-3">
+      <div id="step-indicator" class="flex flex-wrap gap-2 flex-1"></div>
+    </div>
+
+    <!-- Section 1: Funnel Snapshot -->
+    <div id="panel-step-1" class="step-panel active bg-panel border border-line rounded-xl p-5 space-y-5">
+      <h2 class="text-accent font-bold text-sm uppercase tracking-wider">Funnel Snapshot</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[420px]">
+            <thead><tr class="text-slate-500 text-xs uppercase border-b border-line"><th class="text-left py-1.5">Stage</th><th class="text-right">Candidates</th><th class="text-right">Conversion</th><th class="text-right">Drop-off</th></tr></thead>
+            <tbody id="snapshot-table"></tbody>
+          </table>
+        </div>
+        <div>
+          <canvas id="funnel-chart" height="220"></canvas>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-xs uppercase text-slate-400 font-semibold mb-2">Stage-to-Stage Conversion</h3>
+        <div id="conversion-bars" class="space-y-2"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="bg-ink rounded-lg p-3 border border-line">
+          <div class="text-slate-500 text-xs uppercase mb-1">Top Leakage Stage</div>
+          <div id="snapshot-leak" class="text-sm font-bold text-white">—</div>
+        </div>
+        <div class="bg-ink rounded-lg p-3 border border-line">
+          <div class="text-slate-500 text-xs uppercase mb-1">Candidate Velocity (Applied → Offer)</div>
+          <div id="snapshot-velocity" class="text-sm font-bold text-white">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Drop-off Diagnosis -->
+    <div id="panel-step-2" class="step-panel bg-panel border border-line rounded-xl p-5 space-y-5">
+      <h2 class="text-accent font-bold text-sm uppercase tracking-wider">Drop-off Diagnosis</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="overflow-x-auto">
+          <h3 class="text-xs uppercase text-slate-400 font-semibold mb-2">Risk Heatmap</h3>
+          <table class="w-full text-sm min-w-[420px]">
+            <thead><tr class="text-slate-500 text-xs uppercase border-b border-line"><th class="text-left py-1.5">Transition</th><th class="text-right">Actual</th><th class="text-right">Benchmark</th><th class="text-right">Gap</th><th class="text-center">Risk</th></tr></thead>
+            <tbody id="heatmap-table"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 class="text-xs uppercase text-slate-400 font-semibold mb-2">Candidates Lost by Stage</h3>
+          <canvas id="diagnosis-chart" height="220"></canvas>
+        </div>
+      </div>
+      <div class="bg-ink border border-accent rounded-lg p-4 space-y-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <h3 class="text-sm font-bold text-white" id="rootcause-title">—</h3>
+          <span class="badge bg-[#0d2129] text-accent border border-accent" id="rootcause-severity">Severity —</span>
+          <span class="badge bg-slate-800 text-slate-300" id="rootcause-confidence">Confidence —</span>
+        </div>
+        <p class="text-sm text-slate-400" id="rootcause-explanation"></p>
+        <div class="text-xs text-slate-500">Contributing stages: <span id="rootcause-stages" class="text-slate-300"></span></div>
+      </div>
+    </div>
+
+    <!-- Section 3: Intervention Options -->
+    <div id="panel-step-3" class="step-panel bg-panel border border-line rounded-xl p-5 space-y-5">
+      <h2 class="text-accent font-bold text-sm uppercase tracking-wider">Intervention Options</h2>
+      <div id="intervention-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+          <h3 class="text-xs uppercase text-slate-400 font-semibold mb-2">Recovered Candidates by Intervention</h3>
+          <canvas id="intervention-chart" height="220"></canvas>
+        </div>
+        <div class="overflow-x-auto">
+          <h3 class="text-xs uppercase text-slate-400 font-semibold mb-2">ROI Comparison</h3>
+          <table class="w-full text-sm min-w-[360px]">
+            <thead><tr class="text-slate-500 text-xs uppercase border-b border-line"><th class="text-left py-1.5">Intervention</th><th class="text-right">Cost</th><th class="text-right">Recovered</th><th class="text-right">Time Saved</th></tr></thead>
+            <tbody id="roi-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Executive Summary -->
+    <div id="panel-step-4" class="step-panel bg-panel border border-line rounded-xl p-5 space-y-4">
+      <h2 class="text-accent font-bold text-sm uppercase tracking-wider">Executive Summary</h2>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="copyExecSummary()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-semibold hover:bg-slate-700">📋 Copy Summary</button>
+        <button onclick="exportExecSummary()" class="px-3 py-1.5 rounded-lg bg-accent text-ink text-xs font-bold hover:bg-cyan-300">⬇ Export as .txt</button>
+        <button onclick="resetScenario()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-semibold hover:bg-slate-700">↺ Reset Scenario</button>
+      </div>
+      <div id="exec-summary" class="bg-[#f8fafc] text-[#0f172a] rounded-lg p-6 md:p-10 whitespace-pre-line text-sm leading-relaxed shadow-2xl" style="font-family:Georgia,'Times New Roman',serif"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════ Secondary Tabs ══════════════ -->
+  <section class="bg-panel border border-line rounded-xl p-4 space-y-4">
+    <div class="flex flex-wrap gap-1 bg-ink rounded-xl p-1 w-fit">
+      <button class="tab-btn active" id="tab-python" onclick="switchTab('python')">Python Model</button>
+      <button class="tab-btn" id="tab-carousel" onclick="switchTab('carousel')">Carousel Slides</button>
+    </div>
+
+    <div id="panel-python" class="tab-panel active">
+      <pre class="language-python"><code id="code-python"></code></pre>
+    </div>
+
+    <div id="panel-carousel" class="tab-panel">
+      <div class="text-xs text-slate-500 mb-3">6 slides, ready for a LinkedIn document post. Each slide has its own copy button.</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="carousel-grid"></div>
+    </div>
+  </section>
+
+  <footer class="text-center text-slate-600 text-xs py-6">Built as a browser-only portfolio demo · No backend, no build step · Tailwind + Chart.js + Prism.js</footer>
+</div>
+
+<script>
+/* ═══════════════════════════ Formatting helpers ═══════════════════════════ */
+function fmtPct(n,d=1){ return (n*100).toFixed(d)+'%'; }
+function fmtInt(n){ return Math.round(n).toLocaleString('en-US'); }
+function fmtCurrency(n){ return '$'+Math.round(n).toLocaleString('en-US'); }
+function copyText(text, msg){
+  navigator.clipboard.writeText(text).then(()=>alert(msg||'Copied to clipboard.')).catch(()=>alert('Copy failed — select and copy manually.'));
+}
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ═══════════════════════════ Benchmarks ═══════════════════════════ */
+const STAGE_NAMES = ['Sourced','Applied','Screened','HM Interview','Final Interview','Offered','Accepted'];
+const BENCHMARK_CONVERSION = [0.45, 0.55, 0.65, 0.75, 0.65, 0.80];
+
+/* ═══════════════════════════ Scenario data ═══════════════════════════ */
+const SCENARIOS = {
+  highvolume: {
+    id:'highvolume', label:'High-Volume Hiring', icon:'📥',
+    oneLiner:'Many applicants, slow recruiter response, a screening bottleneck.',
+    stages:[2400,960,240,132,92,64,54],
+    velocityDays:34,
+    diagnosis:{
+      rootCause:'Slow Recruiter Response Time', severity:88, confidence:91,
+      contributingStages:['Applied','Screened'],
+      explanation:'Average time-to-first-response after application is 9.4 days. By the time a recruiter screens, top candidates have already accepted competing offers or gone cold.',
+    },
+    interventions:[
+      {name:'Tighten Recruiter SLA to 48 Hours', description:'Enforce a 48-hour first-response SLA on all applied candidates, with automated recruiter alerts for aging applications.', effort:'Low', recoveredCandidates:140, timeSavedDays:6, cost:8000, timeToImplement:'2 weeks', owner:'Recruiting Ops Lead', reversible:true},
+      {name:'Add Candidate Communication Automation', description:'Automate status-update emails and texts at each funnel stage so candidates stay engaged while awaiting recruiter review.', effort:'Medium', recoveredCandidates:95, timeSavedDays:4, cost:25000, timeToImplement:'6 weeks', owner:'TA Systems Manager', reversible:true},
+      {name:'Add Temporary Screening Capacity', description:'Bring on contract recruiting coordinators to clear the applicant backlog during peak volume.', effort:'Medium', recoveredCandidates:110, timeSavedDays:8, cost:60000, timeToImplement:'3 weeks', owner:'TA Director', reversible:true},
+    ],
+  },
+  seniorEng: {
+    id:'seniorEng', label:'Senior Engineering Hiring', icon:'🧑‍💻',
+    oneLiner:'Low applicant volume, high offer decline rate, compensation mismatch.',
+    stages:[180,96,78,61,48,34,18],
+    velocityDays:21,
+    diagnosis:{
+      rootCause:'Compensation Below Market', severity:82, confidence:87,
+      contributingStages:['Offered','Accepted'],
+      explanation:'Offered total compensation sits below the 50th percentile for comparable senior engineering roles in this market, driving late-stage declines after candidates receive competing offers.',
+    },
+    interventions:[
+      {name:'Improve Compensation Benchmarking', description:'Move offer bands for senior and staff engineering roles to at least the 65th market percentile using updated survey data.', effort:'High', recoveredCandidates:9, timeSavedDays:0, cost:180000, timeToImplement:'8 weeks', owner:'Comp & Benefits Lead', reversible:false},
+      {name:'Accelerate Offer-to-Close Conversations', description:'Start compensation expectation-setting during the recruiter screen instead of waiting until the offer stage.', effort:'Low', recoveredCandidates:4, timeSavedDays:5, cost:5000, timeToImplement:'1 week', owner:'Senior Technical Recruiter', reversible:true},
+      {name:'Add Equity & Signing Bonus Flexibility', description:'Give hiring managers discretionary equity or signing-bonus budget to close compensation gaps case-by-case.', effort:'Medium', recoveredCandidates:5, timeSavedDays:2, cost:50000, timeToImplement:'3 weeks', owner:'VP Talent Acquisition', reversible:true},
+    ],
+  },
+  entSales: {
+    id:'entSales', label:'Enterprise Sales Hiring', icon:'💼',
+    oneLiner:'Strong first interviews, poor hiring manager alignment, late-stage drop-off.',
+    stages:[640,310,210,172,132,58,49],
+    velocityDays:29,
+    diagnosis:{
+      rootCause:'Hiring Manager Misalignment', severity:79, confidence:84,
+      contributingStages:['Final Interview','Offered'],
+      explanation:'Hiring managers and cross-functional interviewers are scoring final-round candidates against inconsistent criteria, causing strong candidates to stall after final interviews despite positive recruiter and first-round signals.',
+      },
+    interventions:[
+      {name:'Add Interviewer Calibration Session', description:'Run a structured calibration workshop with hiring managers and panel interviewers to align on a shared scorecard.', effort:'Medium', recoveredCandidates:28, timeSavedDays:6, cost:15000, timeToImplement:'4 weeks', owner:'TA Business Partner', reversible:true},
+      {name:'Publish Structured HM Feedback SLA', description:'Require hiring managers to submit a structured scorecard within 48 hours of every final interview.', effort:'Low', recoveredCandidates:18, timeSavedDays:5, cost:3000, timeToImplement:'2 weeks', owner:'Recruiting Ops Lead', reversible:true},
+      {name:'Reduce Interview Stages', description:'Cut one redundant late-stage panel round for candidates who already cleared a strong hiring-manager interview.', effort:'Low', recoveredCandidates:14, timeSavedDays:7, cost:0, timeToImplement:'1 week', owner:'VP Sales & TA Director', reversible:true},
+    ],
+  },
+  remoteTech: {
+    id:'remoteTech', label:'Remote Tech Hiring', icon:'🌐',
+    oneLiner:'Candidates drop after first screen, employer brand uncertainty, process opacity.',
+    stages:[1100,480,340,102,71,52,41],
+    velocityDays:38,
+    diagnosis:{
+      rootCause:'Employer Brand & Process Opacity', severity:75, confidence:80,
+      contributingStages:['Screened','HM Interview'],
+      explanation:'Candidates who pass the recruiter screen frequently go cold before the hiring manager interview, citing unclear next steps, limited visibility into team and culture, and uncertainty about the fully-remote work model.',
+    },
+    interventions:[
+      {name:'Add Candidate Communication Automation', description:'Automate stage-by-stage status updates and clear next-step timelines so candidates never wonder where they stand.', effort:'Medium', recoveredCandidates:85, timeSavedDays:5, cost:20000, timeToImplement:'5 weeks', owner:'TA Systems Manager', reversible:true},
+      {name:'Launch Remote Culture & Team Preview', description:'Give candidates async video team intros and a culture and onboarding preview document before the hiring manager round.', effort:'Medium', recoveredCandidates:60, timeSavedDays:3, cost:18000, timeToImplement:'6 weeks', owner:'Employer Brand Lead', reversible:true},
+      {name:'Improve Job Description Clarity', description:'Rewrite remote job postings to clearly state timezone expectations, tooling, and remote-work support.', effort:'Low', recoveredCandidates:30, timeSavedDays:2, cost:2000, timeToImplement:'1 week', owner:'Recruiting Ops Lead', reversible:true},
+    ],
+  },
+};
+
+/* ═══════════════════════════ App state ═══════════════════════════ */
+let state = null;
+
+function computeFunnel(stagesCounts){
+  const conversions = [];
+  const lost = [];
+  for(let i=0;i<stagesCounts.length-1;i++){
+    conversions.push(stagesCounts[i+1] / stagesCounts[i]);
+    lost.push(stagesCounts[i] - stagesCounts[i+1]);
+  }
+  const gaps = conversions.map((c,i)=>c - BENCHMARK_CONVERSION[i]);
+  let worstIdx = 0;
+  gaps.forEach((g,i)=>{ if(g < gaps[worstIdx]) worstIdx = i; });
+  const expectedNext = Math.round(stagesCounts[worstIdx] * BENCHMARK_CONVERSION[worstIdx]);
+  const recoverable = Math.max(0, expectedNext - stagesCounts[worstIdx+1]);
+  return { conversions, lost, gaps, worstIdx, recoverable };
+}
+function riskLevel(gap){
+  if(gap <= -0.15) return 'red';
+  if(gap <= -0.05) return 'amber';
+  return 'green';
+}
+
+/* ═══════════════════════════ Load / render a scenario ═══════════════════════════ */
+function loadScenario(id){
+  const s = SCENARIOS[id];
+  const funnel = computeFunnel(s.stages);
+  state = { scenarioId:id, scenario:s, funnel };
+  document.querySelectorAll('.scenario-card').forEach(c=>c.classList.toggle('active', c.dataset.id===id));
+  renderHero();
+  renderSnapshot();
+  renderDiagnosis();
+  renderInterventions();
+  renderExecSummary();
+}
+
+function renderScenarioGrid(){
+  const grid = document.getElementById('scenario-grid');
+  grid.innerHTML = Object.values(SCENARIOS).map(s=>`
+    <div class="scenario-card rounded-xl p-4 bg-panel" data-id="${s.id}" onclick="loadScenario('${s.id}')">
+      <div class="text-2xl mb-2">${s.icon}</div>
+      <div class="font-bold text-sm text-white">${s.label}</div>
+      <div class="text-xs text-slate-400 mt-1">${s.oneLiner}</div>
+    </div>`).join('');
+}
+
+/* ═══════════════════════════ Hero ═══════════════════════════ */
+function renderHero(){
+  const s = state.scenario, f = state.funnel;
+  const conversionRate = s.stages[6] / s.stages[0];
+  document.getElementById('stat-conversion').textContent = fmtPct(conversionRate, 2);
+  document.getElementById('stat-dropoff').textContent = fmtPct(1 - conversionRate, 2);
+  document.getElementById('stat-recoverable').textContent = fmtInt(f.recoverable);
+
+  const fromName = STAGE_NAMES[f.worstIdx], toName = STAGE_NAMES[f.worstIdx+1];
+  document.getElementById('top-leak-banner').innerHTML = `
+    <span class="badge bg-red-950 text-red-300 border border-red-800">Top Leak Detected</span>
+    <span class="text-white font-semibold">${fromName} → ${toName}</span>
+    <span class="text-slate-400">· ${fmtPct(f.conversions[f.worstIdx])} actual conversion vs ${fmtPct(BENCHMARK_CONVERSION[f.worstIdx])} benchmark</span>`;
+
+  const max = Math.max(...s.stages);
+  document.getElementById('funnel-ladder').innerHTML = STAGE_NAMES.map((name,i)=>{
+    const pct = (s.stages[i]/max*100).toFixed(1);
+    const convBadge = i>0 ? `<span class="text-[10px] text-slate-500 ml-2">${fmtPct(f.conversions[i-1])} from ${STAGE_NAMES[i-1]}</span>` : '';
+    return `<div>
+      <div class="flex justify-between text-xs mb-1"><span class="text-slate-300 font-medium">${name}${convBadge}</span><span class="text-slate-400">${fmtInt(s.stages[i])}</span></div>
+      <div class="conv-bar" style="height:10px"><div class="funnel-bar" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════ Step navigation ═══════════════════════════ */
+const STEP_NAMES = ['Funnel Snapshot','Drop-off Diagnosis','Intervention Options','Executive Summary'];
+let currentStep = 1;
+function renderStepIndicator(){
+  document.getElementById('step-indicator').innerHTML = STEP_NAMES.map((name,i)=>{
+    const n=i+1;
+    const cls = n===currentStep ? 'active' : (n<currentStep ? 'done':'');
+    return `<div class="step-pill ${cls}" onclick="goToStep(${n})">${n}. ${name}</div>`;
+  }).join('');
+}
+function goToStep(n){
+  currentStep = n;
+  document.querySelectorAll('.step-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-step-'+n).classList.add('active');
+  renderStepIndicator();
+}
+
+/* ═══════════════════════════ Section 1: Funnel Snapshot ═══════════════════════════ */
+let funnelChartInstance = null;
+function renderSnapshot(){
+  const s = state.scenario, f = state.funnel;
+  document.getElementById('snapshot-table').innerHTML = STAGE_NAMES.map((name,i)=>{
+    const conv = i>0 ? fmtPct(f.conversions[i-1]) : '—';
+    const drop = i>0 ? fmtInt(f.lost[i-1]) : '—';
+    return `<tr class="border-b border-line/50">
+      <td class="py-1.5">${name}</td>
+      <td class="text-right">${fmtInt(s.stages[i])}</td>
+      <td class="text-right ${i>0 && riskLevel(f.gaps[i-1])==='red' ? 'text-red-400 font-semibold':''}">${conv}</td>
+      <td class="text-right text-slate-400">${drop}</td>
+    </tr>`;
+  }).join('');
+
+  const ctx = document.getElementById('funnel-chart').getContext('2d');
+  if(funnelChartInstance) funnelChartInstance.destroy();
+  funnelChartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:STAGE_NAMES, datasets:[{ data:s.stages, backgroundColor:'#22d3ee', borderRadius:4 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{ x:{ ticks:{color:'#94a3b8'}, grid:{color:'#1f2937'} }, y:{ ticks:{color:'#94a3b8', font:{size:10}}, grid:{display:false} } } }
+  });
+
+  document.getElementById('conversion-bars').innerHTML = f.conversions.map((c,i)=>{
+    const risk = riskLevel(f.gaps[i]);
+    const color = risk==='red' ? '#ef4444' : risk==='amber' ? '#eab308' : '#22d3ee';
+    return `<div>
+      <div class="flex justify-between text-xs mb-1"><span class="text-slate-300">${STAGE_NAMES[i]} → ${STAGE_NAMES[i+1]}</span><span class="text-slate-400">${fmtPct(c)}</span></div>
+      <div class="conv-bar"><div class="conv-fill" style="width:${(c*100).toFixed(1)}%; background:${color}"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('snapshot-leak').textContent = `${STAGE_NAMES[f.worstIdx]} → ${STAGE_NAMES[f.worstIdx+1]} (${fmtPct(f.conversions[f.worstIdx])})`;
+  document.getElementById('snapshot-velocity').textContent = s.velocityDays + ' days';
+}
+
+/* ═══════════════════════════ Section 2: Drop-off Diagnosis ═══════════════════════════ */
+let diagnosisChartInstance = null;
+function renderDiagnosis(){
+  const s = state.scenario, f = state.funnel;
+  document.getElementById('heatmap-table').innerHTML = f.conversions.map((c,i)=>{
+    const risk = riskLevel(f.gaps[i]);
+    const gapStr = (f.gaps[i]>=0?'+':'') + fmtPct(f.gaps[i]);
+    return `<tr class="border-b border-line/50">
+      <td class="py-1.5">${STAGE_NAMES[i]} → ${STAGE_NAMES[i+1]}</td>
+      <td class="text-right">${fmtPct(c)}</td>
+      <td class="text-right text-slate-400">${fmtPct(BENCHMARK_CONVERSION[i])}</td>
+      <td class="text-right">${gapStr}</td>
+      <td class="text-center"><span class="badge risk-${risk}">${risk.toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+
+  const ctx = document.getElementById('diagnosis-chart').getContext('2d');
+  if(diagnosisChartInstance) diagnosisChartInstance.destroy();
+  diagnosisChartInstance = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:STAGE_NAMES.slice(0,6), datasets:[{ data:f.lost, backgroundColor:['#22d3ee','#0ea5e9','#6366f1','#a855f7','#ec4899','#f97316'] }] },
+    options:{ plugins:{ legend:{ position:'bottom', labels:{boxWidth:12, font:{size:10}, color:'#94a3b8'} } } }
+  });
+
+  const d = s.diagnosis;
+  document.getElementById('rootcause-title').textContent = d.rootCause;
+  document.getElementById('rootcause-severity').textContent = 'Severity ' + d.severity + '/100';
+  document.getElementById('rootcause-confidence').textContent = 'Confidence ' + d.confidence + '/100';
+  document.getElementById('rootcause-explanation').textContent = d.explanation;
+  document.getElementById('rootcause-stages').textContent = d.contributingStages.join(', ');
+}
+
+/* ═══════════════════════════ Section 3: Intervention Options ═══════════════════════════ */
+let interventionChartInstance = null;
+function rankInterventions(interventions){
+  return [...interventions].sort((a,b)=> b.recoveredCandidates - a.recoveredCandidates || a.cost - b.cost);
+}
+function renderInterventions(){
+  const s = state.scenario;
+  const ranked = rankInterventions(s.interventions);
+  const effortColor = {Low:'bg-emerald-950 text-emerald-400 border border-emerald-800', Medium:'bg-amber-950 text-amber-400 border border-amber-800', High:'bg-red-950 text-red-400 border border-red-800'};
+
+  document.getElementById('intervention-grid').innerHTML = ranked.map((o,i)=>`
+    <div class="bg-ink border ${i===0?'border-accent':'border-line'} rounded-lg p-4 space-y-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="font-bold text-sm text-white">${o.name}</div>
+        ${i===0?'<span class="badge bg-[#0d2129] text-accent border border-accent">Top Pick</span>':''}
+      </div>
+      <span class="badge ${effortColor[o.effort]}">${o.effort} Effort</span>
+      <p class="text-xs text-slate-400">${o.description}</p>
+      <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+        <div><span class="text-slate-500">Time to implement:</span> ${o.timeToImplement}</div>
+        <div><span class="text-slate-500">Owner:</span> ${o.owner}</div>
+        <div><span class="text-slate-500">Recovered:</span> ${o.recoveredCandidates} candidates</div>
+        <div><span class="text-slate-500">Reversible:</span> ${o.reversible ? 'Yes' : 'No'}</div>
+      </div>
+    </div>`).join('');
+
+  const ctx = document.getElementById('intervention-chart').getContext('2d');
+  if(interventionChartInstance) interventionChartInstance.destroy();
+  const effortBar = {Low:'#22d3ee', Medium:'#eab308', High:'#ef4444'};
+  interventionChartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:ranked.map(o=>o.name), datasets:[{ data:ranked.map(o=>o.recoveredCandidates), backgroundColor:ranked.map(o=>effortBar[o.effort]), borderRadius:4 }] },
+    options:{ plugins:{legend:{display:false}},
+      scales:{ x:{ ticks:{color:'#94a3b8', font:{size:9}}, grid:{color:'#1f2937'} }, y:{ ticks:{color:'#94a3b8'}, grid:{color:'#1f2937'} } } }
+  });
+
+  document.getElementById('roi-table').innerHTML = ranked.map(o=>`
+    <tr class="border-b border-line/50">
+      <td class="py-1.5 text-white font-medium">${o.name}</td>
+      <td class="text-right">${fmtCurrency(o.cost)}</td>
+      <td class="text-right text-accent font-semibold">${o.recoveredCandidates}</td>
+      <td class="text-right text-slate-400">${o.timeSavedDays}d</td>
+    </tr>`).join('');
+}
+
+/* ═══════════════════════════ Section 4: Executive Summary ═══════════════════════════ */
+function buildExecSummaryText(){
+  const s = state.scenario, f = state.funnel;
+  const top = rankInterventions(s.interventions)[0];
+  const fromName = STAGE_NAMES[f.worstIdx], toName = STAGE_NAMES[f.worstIdx+1];
+  return `EXECUTIVE SUMMARY
+${'='.repeat(60)}
+
+SCENARIO
+  ${s.label}
+  ${s.oneLiner}
+
+TOP LEAK STAGE
+  ${fromName} to ${toName}
+  Actual conversion: ${fmtPct(f.conversions[f.worstIdx])} (benchmark: ${fmtPct(BENCHMARK_CONVERSION[f.worstIdx])})
+  Estimated recoverable candidates: ${fmtInt(f.recoverable)}
+
+ROOT CAUSE
+  ${s.diagnosis.rootCause} (Severity ${s.diagnosis.severity}/100, Confidence ${s.diagnosis.confidence}/100)
+  ${s.diagnosis.explanation}
+
+RECOMMENDED ACTION
+  ${top.name}
+  ${top.description}
+
+EXPECTED IMPACT
+  ${top.recoveredCandidates} candidates recovered · ${top.timeSavedDays} days saved in time-to-fill
+  Cost: ${fmtCurrency(top.cost)} · Time to implement: ${top.timeToImplement} · Reversible: ${top.reversible ? 'Yes' : 'No'}
+
+OWNER
+  ${top.owner}
+
+NEXT STEP
+  Schedule a kickoff with ${top.owner} within ${top.timeToImplement}. Track resolution of "${s.diagnosis.rootCause}" via the weekly funnel review.
+`;
+}
+function renderExecSummary(){
+  document.getElementById('exec-summary').textContent = buildExecSummaryText();
+}
+function copyExecSummary(){ copyText(buildExecSummaryText(), 'Executive summary copied to clipboard.'); }
+function exportExecSummary(){ downloadText(`signalchain-summary-${state.scenarioId}.txt`, buildExecSummaryText()); }
+function resetScenario(){ loadScenario('highvolume'); goToStep(1); }
+
+/* ═══════════════════════════ Secondary tabs ═══════════════════════════ */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+  Prism.highlightAll();
+}
+
+const PYTHON_CODE = `from dataclasses import dataclass
+
+STAGE_NAMES = ["Sourced", "Applied", "Screened", "HM Interview", "Final Interview", "Offered", "Accepted"]
+BENCHMARK_CONVERSION = [0.45, 0.55, 0.65, 0.75, 0.65, 0.80]
+
+
+def stage_conversions(stage_counts: list[int]) -> list[float]:
+    """stage_counts is ordered to match STAGE_NAMES."""
+    return [
+        round(stage_counts[i + 1] / stage_counts[i], 4)
+        for i in range(len(stage_counts) - 1)
+    ]
+
+
+def detect_bottleneck(stage_counts: list[int]) -> dict:
+    """The leak is the transition with the largest negative gap vs. benchmark."""
+    actual = stage_conversions(stage_counts)
+    gaps = [a - b for a, b in zip(actual, BENCHMARK_CONVERSION)]
+    worst_idx = gaps.index(min(gaps))
+    return {
+        "from_stage": STAGE_NAMES[worst_idx],
+        "to_stage": STAGE_NAMES[worst_idx + 1],
+        "actual_conversion": actual[worst_idx],
+        "benchmark_conversion": BENCHMARK_CONVERSION[worst_idx],
+        "gap": gaps[worst_idx],
+        "worst_idx": worst_idx,
+    }
+
+
+def estimate_recoverable(stage_counts: list[int]) -> int:
+    leak = detect_bottleneck(stage_counts)
+    idx = leak["worst_idx"]
+    expected_next = round(stage_counts[idx] * BENCHMARK_CONVERSION[idx])
+    actual_next = stage_counts[idx + 1]
+    return max(0, expected_next - actual_next)
+
+
+@dataclass
+class Intervention:
+    name: str
+    recovered_candidates: int
+    cost: float
+    time_saved_days: int
+
+
+def rank_interventions(interventions: list[Intervention]) -> list[Intervention]:
+    """Rank by candidates recovered, tie-break on lower cost."""
+    return sorted(interventions, key=lambda x: (-x.recovered_candidates, x.cost))
+
+
+# Example
+# stage_counts = [2400, 960, 240, 132, 92, 64, 54]
+# leak = detect_bottleneck(stage_counts)
+# recoverable = estimate_recoverable(stage_counts)
+`;
+document.getElementById('code-python').textContent = PYTHON_CODE;
+
+/* ═══════════════════════════ LinkedIn carousel slides ═══════════════════════════ */
+const SLIDES = [
+  {title:"Most teams know their funnel numbers. Almost none know where they are losing great candidates.", body:"I built SignalChain — a Recruiting Funnel Loss Analyzer that runs entirely in the browser."},
+  {title:"Why teams lose candidates", body:"Slow recruiter response. Compensation mismatches. Hiring manager misalignment. Unclear process. Weak employer brand. It is rarely just one thing."},
+  {title:"The top bottleneck", body:"One stage-to-stage transition can leak 30%+ more candidates than the industry benchmark conversion rate — and most teams never isolate which one."},
+  {title:"The diagnosis logic", body:"A benchmark-driven detector flags the worst transition, then scores a likely root cause with a severity and confidence rating."},
+  {title:"The intervention ranking", body:"Three ranked interventions, each with candidates recovered, cost, time to implement, and owner — a real decision artifact, not just a chart."},
+  {title:"Try it yourself", body:"4 real hiring scenarios. Built with Tailwind, Chart.js, and Prism — zero backend. Link in the comments."},
+];
+function renderCarousel(){
+  document.getElementById('carousel-grid').innerHTML = SLIDES.map((sl,i)=>`
+    <div class="slide-card">
+      <div>
+        <div class="text-accent text-xs font-bold mb-2">SLIDE ${i+1} / ${SLIDES.length}</div>
+        <div class="text-lg font-extrabold text-white leading-snug">${sl.title}</div>
+        <div class="text-sm text-slate-400 mt-3">${sl.body}</div>
+      </div>
+      <button onclick="copySlide(${i})" class="mt-4 text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 font-semibold hover:bg-slate-700 self-start">📋 Copy slide text</button>
+    </div>`).join('');
+}
+function copySlide(i){
+  const sl = SLIDES[i];
+  copyText(sl.title+'\n\n'+sl.body, 'Slide '+(i+1)+' copied.');
+}
+
+/* ═══════════════════════════ Init ═══════════════════════════ */
+renderScenarioGrid();
+renderStepIndicator();
+renderCarousel();
+loadScenario('highvolume');
+</script>
+</body>
+</html>

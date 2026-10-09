@@ -1,0 +1,1289 @@
+<!--
+LINKEDIN CAPTION:
+The average data breach now costs $4.88M globally, $10.22M in the U.S.
+I built an interactive simulator that shows any company exactly what a breach would cost them today —
+and which security investment cuts that risk fastest per dollar spent.
+Try it: [link]
+What's your company's biggest security blind spot? 👇
+#CyberSecurity #RiskManagement #DataAnalytics #Enterprise #AI #PowerBI
+-->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreachGuard IQ — Data Breach Risk & Cost Exposure Simulator</title>
+
+<!-- ===== CDN LIBRARIES (no backend, no API keys, no build step) ===== -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+<style>
+  /* =========================================================================
+     THEME TOKENS — dark enterprise BI dashboard palette (Power BI / Bloomberg
+     terminal look). Everything below reads from these variables so the whole
+     app can be re-themed from one place.
+     ========================================================================= */
+  :root{
+    --bg:#0a0e17;            /* page background */
+    --panel:#111827;         /* rail / nav background */
+    --card:#1a2332;          /* KPI card / chart card background */
+    --card-hover:#202b40;
+    --danger:#dc2626;        /* risk / cost accent */
+    --danger-soft:rgba(220,38,38,.15);
+    --safe:#059669;          /* savings / safe accent */
+    --safe-soft:rgba(5,150,105,.15);
+    --warn:#d97706;          /* warning accent */
+    --warn-soft:rgba(217,119,6,.15);
+    --text:#f1f5f9;          /* primary text */
+    --text2:#94a3b8;         /* secondary text */
+    --muted:#64748b;         /* de-emphasised / benchmark marks */
+    --border:#26324a;
+    --cat-blue:#3b82f6;
+    --cat-violet:#8b5cf6;
+    --cat-orange:#f97316;
+    --cat-gold:#eab308;
+    --font: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{background:var(--bg); color:var(--text); font-family:var(--font); margin:0; padding:0;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--panel);}
+  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:6px;}
+
+  /* ---------- Ticker banner ---------- */
+  .ticker-wrap{background:linear-gradient(90deg,#111827,#1a2332,#111827); border-bottom:1px solid var(--border); overflow:hidden; white-space:nowrap; padding:8px 0;}
+  .ticker-track{display:inline-block; padding-left:100%; animation:ticker 28s linear infinite; font-size:.8rem; color:var(--text2); letter-spacing:.02em;}
+  @keyframes ticker{ from{transform:translateX(0);} to{transform:translateX(-100%);} }
+
+  /* ---------- Cards ---------- */
+  .kpi-card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; position:relative; overflow:hidden;}
+  .kpi-card::before{content:""; position:absolute; top:0; left:0; width:4px; height:100%;}
+  .kpi-danger::before{background:var(--danger);}
+  .kpi-safe::before{background:var(--safe);}
+  .kpi-warn::before{background:var(--warn);}
+  .kpi-blue::before{background:var(--cat-blue);}
+  .chart-card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px;}
+
+  /* ---------- Left rail (slicers) ---------- */
+  .rail{background:var(--panel); border-right:1px solid var(--border);}
+  .slicer-label{font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text2); font-weight:600; margin-bottom:6px; display:block;}
+  select.slicer, input.slicer-text{width:100%; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:.85rem;}
+  select.slicer:focus{outline:2px solid var(--cat-blue); outline-offset:1px;}
+  .radio-row{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:.83rem; border:1px solid transparent;}
+  .radio-row:hover{background:var(--card-hover);}
+  .radio-row.active{background:var(--danger-soft); border-color:var(--danger); color:var(--text);}
+  .star{cursor:pointer; font-size:1.35rem; color:var(--border); transition:color .1s;}
+  .star.filled{color:var(--warn);}
+
+  /* ---------- Tabs (Power BI report-page tabs) ---------- */
+  .tab-btn{padding:10px 16px; font-size:.85rem; font-weight:600; color:var(--text2); border-bottom:2px solid transparent; cursor:pointer; white-space:nowrap;}
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--text); border-bottom-color:var(--danger);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* ---------- Misc ---------- */
+  .pill{display:inline-flex; align-items:center; gap:4px; font-size:.72rem; padding:2px 8px; border-radius:999px; font-weight:600;}
+  .pill-up{background:var(--danger-soft); color:#fca5a5;}
+  .pill-down{background:var(--safe-soft); color:#6ee7b7;}
+  .nav-btn{background:var(--card); border:1px solid var(--border); color:var(--text); font-size:.78rem; padding:6px 12px; border-radius:6px; cursor:pointer;}
+  .nav-btn:hover{background:var(--card-hover);}
+  table.matrix{width:100%; border-collapse:collapse; font-size:.83rem;}
+  table.matrix th{text-align:left; color:var(--text2); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; padding:10px 12px; border-bottom:1px solid var(--border);}
+  table.matrix td{padding:10px 12px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums;}
+  table.matrix tr.invest-row{cursor:pointer;}
+  table.matrix tr.invest-row:hover{background:var(--card-hover);}
+  .best-badge{background:var(--safe); color:#04140f; font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:999px;}
+  .copy-btn{position:absolute; top:10px; right:10px; background:#2a3650; color:var(--text); border:none; font-size:.72rem; padding:4px 10px; border-radius:6px; cursor:pointer;}
+  .copy-btn:hover{background:#374363;}
+  .code-block{position:relative;}
+  input[type=range].bg-slider{-webkit-appearance:none; height:6px; border-radius:999px; background:linear-gradient(90deg, var(--safe) 0%, var(--warn) 55%, var(--danger) 100%);}
+  input[type=range].bg-slider::-webkit-slider-thumb{-webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#fff; border:3px solid var(--danger); cursor:pointer; margin-top:-7px;}
+  .slide{display:none;}
+  .slide.active{display:flex;}
+  .gauge-wrap{position:relative; width:100%; max-width:260px; margin:0 auto;}
+  .gauge-needle{position:absolute; left:50%; bottom:6px; width:3px; height:46%; background:var(--text); transform-origin:bottom center; transform:translateX(-50%) rotate(0deg); transition:transform .4s ease;}
+  .gauge-needle::after{content:""; position:absolute; bottom:-6px; left:50%; width:12px; height:12px; background:var(--text); border-radius:50%; transform:translate(-50%,0);}
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- =========================================================================
+     TOP NAVIGATION (Power BI ribbon style)
+     ========================================================================= -->
+<nav class="sticky top-0 z-50 flex items-center justify-between px-5 py-3" style="background:var(--panel); border-bottom:1px solid var(--border);">
+  <div class="flex items-center gap-2 font-bold text-lg">🛡️ <span>BreachGuard IQ</span></div>
+  <div class="hidden md:block text-sm" style="color:var(--text2);">Data Breach Risk &amp; Cost Exposure Simulator</div>
+  <div class="flex items-center gap-2">
+    <button class="nav-btn" onclick="alert('This would link to the project GitHub repository.')">⭐ GitHub</button>
+    <button class="nav-btn" onclick="switchTab('brief')">Export Report</button>
+    <button class="nav-btn" onclick="alert('This would link to the author\'s portfolio site.')">View Portfolio</button>
+  </div>
+</nav>
+
+<!-- Ticker banner -->
+<div class="ticker-wrap">
+  <span class="ticker-track">Global avg breach cost: $4.88M &nbsp;·&nbsp; U.S. avg: $10.22M &nbsp;·&nbsp; Breaches over 200 days cost 30% more &nbsp;·&nbsp; AI security cuts cost by up to $1.9M &nbsp;&nbsp;&nbsp;&nbsp; Global avg breach cost: $4.88M &nbsp;·&nbsp; U.S. avg: $10.22M &nbsp;·&nbsp; Breaches over 200 days cost 30% more &nbsp;·&nbsp; AI security cuts cost by up to $1.9M</span>
+</div>
+
+<div class="flex">
+
+  <!-- =========================================================================
+       LEFT RAIL — persistent Power BI style slicers
+       ========================================================================= -->
+  <aside class="rail w-72 shrink-0 p-4 hidden lg:block" style="height:calc(100vh - 89px); overflow-y:auto; position:sticky; top:89px;">
+    <div class="text-xs font-bold uppercase tracking-wide mb-4" style="color:var(--text2);">Filters (Slicers)</div>
+
+    <!-- SLICER 1: Industry -->
+    <div class="mb-4">
+      <span class="slicer-label">Industry</span>
+      <select id="slicerIndustry" class="slicer" onchange="onSlicerChange()">
+        <option value="healthcare">Healthcare</option>
+        <option value="financial">Financial Services</option>
+        <option value="technology" selected>Technology</option>
+        <option value="retail">Retail</option>
+        <option value="manufacturing">Manufacturing</option>
+        <option value="government">Government</option>
+      </select>
+    </div>
+
+    <!-- SLICER 2: Company size -->
+    <div class="mb-4">
+      <span class="slicer-label">Company Size</span>
+      <select id="slicerSize" class="slicer" onchange="onSlicerChange()">
+        <option value="small">Small (&lt; 1,000 employees)</option>
+        <option value="mid" selected>Mid (1K – 10K)</option>
+        <option value="large">Large (10K – 50K)</option>
+        <option value="enterprise">Enterprise (50K+)</option>
+      </select>
+    </div>
+
+    <!-- SLICER 3: Region -->
+    <div class="mb-4">
+      <span class="slicer-label">Region</span>
+      <select id="slicerRegion" class="slicer" onchange="onSlicerChange()">
+        <option value="us">United States</option>
+        <option value="europe">Europe</option>
+        <option value="apac">APAC</option>
+        <option value="global" selected>Global Average</option>
+      </select>
+    </div>
+
+    <!-- SLICER 4: Data sensitivity -->
+    <div class="mb-4">
+      <span class="slicer-label">Data Sensitivity Level</span>
+      <div id="slicerSensitivity">
+        <div class="radio-row" data-val="low" onclick="setSensitivity('low')">
+          <span>⚪</span><span>Low (public data)</span>
+        </div>
+        <div class="radio-row active" data-val="medium" onclick="setSensitivity('medium')">
+          <span>⚪</span><span>Medium (PII)</span>
+        </div>
+        <div class="radio-row" data-val="high" onclick="setSensitivity('high')">
+          <span>⚪</span><span>High (financial / health records)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLICER 5: Security maturity -->
+    <div class="mb-4">
+      <span class="slicer-label">Current Security Maturity</span>
+      <div id="slicerMaturity" class="flex gap-1 text-2xl">
+        <span class="star" data-v="1" onclick="setMaturity(1)">★</span>
+        <span class="star" data-v="2" onclick="setMaturity(2)">★</span>
+        <span class="star" data-v="3" onclick="setMaturity(3)">★</span>
+        <span class="star" data-v="4" onclick="setMaturity(4)">★</span>
+        <span class="star" data-v="5" onclick="setMaturity(5)">★</span>
+      </div>
+      <div class="text-xs mt-1" style="color:var(--text2);" id="maturityCaption">3 / 5 — Moderate maturity</div>
+    </div>
+
+    <button class="w-full nav-btn mt-2" onclick="resetFilters()">🔄 Reset Filters</button>
+
+    <div class="text-xs mt-6 pt-4" style="color:var(--muted); border-top:1px solid var(--border);">
+      All 5 slicers recalculate every KPI and chart across all tabs live.
+    </div>
+  </aside>
+
+  <!-- =========================================================================
+       MAIN WORKSPACE
+       ========================================================================= -->
+  <main class="flex-1 p-5 min-w-0">
+
+    <!-- Tab bar -->
+    <div class="flex gap-1 overflow-x-auto mb-5" style="border-bottom:1px solid var(--border);">
+      <div class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">📊 Risk Overview</div>
+      <div class="tab-btn" data-tab="detection" onclick="switchTab('detection')">⏱️ Detection Speed Impact</div>
+      <div class="tab-btn" data-tab="advisor" onclick="switchTab('advisor')">💊 Risk Reduction Advisor</div>
+      <div class="tab-btn" data-tab="brief" onclick="switchTab('brief')">📋 Executive Risk Brief</div>
+      <div class="tab-btn" data-tab="python" onclick="switchTab('python')">🐍 Python Model</div>
+      <div class="tab-btn" data-tab="carousel" onclick="switchTab('carousel')">🎞️ Carousel Slides</div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 1 — RISK OVERVIEW
+         =================================================================== -->
+    <div id="tab-overview" class="tab-panel active">
+
+      <!-- KPI row -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+        <div class="kpi-card kpi-danger">
+          <div class="text-xs" style="color:var(--text2);">Estimated Breach Cost Today</div>
+          <div class="text-3xl font-bold mt-1" id="kpiCost" style="color:var(--danger);">$0.0M</div>
+          <div class="mt-2"><span class="pill pill-up" id="kpiCostTrend">↑ vs industry avg</span></div>
+        </div>
+        <div class="kpi-card kpi-warn">
+          <div class="text-xs" style="color:var(--text2);">Days to Contain (Est.)</div>
+          <div class="text-3xl font-bold mt-1" id="kpiDays" style="color:var(--warn);">0 days</div>
+          <div class="mt-2"><span class="pill" id="kpiDaysTrend">vs 200-day benchmark</span></div>
+        </div>
+        <div class="kpi-card kpi-blue">
+          <div class="text-xs" style="color:var(--text2);">Records at Risk</div>
+          <div class="text-3xl font-bold mt-1" id="kpiRecords" style="color:var(--cat-blue);">0</div>
+          <div class="mt-2 text-xs" style="color:var(--text2);">Estimated by company size &amp; sensitivity</div>
+        </div>
+        <div class="kpi-card kpi-safe">
+          <div class="text-xs" style="color:var(--text2);">Risk Score (0–100)</div>
+          <div class="text-3xl font-bold mt-1" id="kpiRisk" style="color:var(--safe);">0</div>
+          <div class="mt-2 text-xs" id="kpiRiskLabel" style="color:var(--text2);">—</div>
+        </div>
+      </div>
+
+      <!-- Chart row -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-5">
+        <div class="chart-card">
+          <div class="font-semibold mb-2 text-sm">Breach Cost Breakdown</div>
+          <div style="position:relative; height:230px;"><canvas id="chartDonut"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="font-semibold mb-2 text-sm">Cost by Industry Benchmark</div>
+          <div style="position:relative; height:230px;"><canvas id="chartIndustryBar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="font-semibold mb-2 text-sm">Security Maturity vs. Cost Impact</div>
+          <div class="gauge-wrap" style="height:150px;">
+            <canvas id="chartGauge"></canvas>
+            <div class="gauge-needle" id="gaugeNeedle"></div>
+          </div>
+          <div class="text-center text-xs mt-2" style="color:var(--text2);" id="gaugeCaption">—</div>
+        </div>
+      </div>
+
+      <!-- Scatter row -->
+      <div class="chart-card">
+        <div class="font-semibold mb-2 text-sm">Company Size vs. Breach Cost</div>
+        <div style="position:relative; height:280px;"><canvas id="chartScatter"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 2 — DETECTION SPEED IMPACT
+         =================================================================== -->
+    <div id="tab-detection" class="tab-panel">
+      <h2 class="text-xl font-bold mb-1">⏱️ Every Day Matters — The Cost of Detection Delay</h2>
+      <p class="text-sm mb-4" style="color:var(--text2);">Breaches contained under 200 days average $3.87M. Past 200 days, average cost jumps to $5.01M.</p>
+
+      <div class="chart-card mb-5">
+        <label class="slicer-label">Days to Detect &amp; Contain: <span id="daysSliderVal" style="color:var(--text); font-weight:700;">247</span> days</label>
+        <input type="range" min="10" max="365" value="247" id="daysSlider" class="w-full bg-slider" oninput="onDaysSlider()">
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);"><span>10</span><span>365</span></div>
+      </div>
+
+      <div class="chart-card mb-5">
+        <div style="position:relative; height:320px;"><canvas id="chartDetectionLine"></canvas></div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+        <div class="kpi-card kpi-danger">
+          <div class="text-xs" style="color:var(--text2);">Cost at your current speed</div>
+          <div class="text-2xl font-bold mt-1" id="kpiSpeedCurrent" style="color:var(--danger);">$0.0M</div>
+        </div>
+        <div class="kpi-card kpi-warn">
+          <div class="text-xs" style="color:var(--text2);">Cost if contained in 200 days</div>
+          <div class="text-2xl font-bold mt-1" id="kpiSpeed200" style="color:var(--warn);">$0.0M</div>
+          <div class="text-xs mt-1" id="kpiSpeed200Save" style="color:var(--text2);">—</div>
+        </div>
+        <div class="kpi-card kpi-safe">
+          <div class="text-xs" style="color:var(--text2);">Cost if contained in 90 days (best-in-class)</div>
+          <div class="text-2xl font-bold mt-1" id="kpiSpeed90" style="color:var(--safe);">$0.0M</div>
+          <div class="text-xs mt-1" id="kpiSpeed90Save" style="color:var(--text2);">—</div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="font-semibold mb-2 text-sm">How Detection Speed Changes Your Cost</div>
+        <div style="position:relative; height:320px;"><canvas id="chartWaterfall"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 3 — RISK REDUCTION ADVISOR
+         =================================================================== -->
+    <div id="tab-advisor" class="tab-panel">
+      <h2 class="text-xl font-bold mb-1">💊 Which Security Investment Cuts Risk the Most?</h2>
+      <p class="text-sm mb-4" style="color:var(--text2);">Ranked for your current filter profile — cost, risk reduction, ROI and payback period.</p>
+
+      <div class="kpi-card kpi-safe mb-5" id="bestRoiCard">
+        <div class="text-xs" style="color:var(--text2);">🎯 Best ROI Pick For Your Profile</div>
+        <div class="text-2xl font-bold mt-1" id="bestRoiName" style="color:var(--safe);">—</div>
+        <div class="text-sm mt-1" style="color:var(--text2);" id="bestRoiDetail">—</div>
+      </div>
+
+      <div class="chart-card mb-5" style="overflow-x:auto;">
+        <table class="matrix" id="investmentTable">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Investment</th>
+              <th>Cost to Implement</th>
+              <th>Risk Reduction</th>
+              <th>Dollar Savings</th>
+              <th>ROI</th>
+              <th>Payback Period</th>
+            </tr>
+          </thead>
+          <tbody id="investmentTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="chart-card">
+          <div class="font-semibold mb-2 text-sm">Cost vs. Risk Reduction</div>
+          <div style="position:relative; height:300px;"><canvas id="chartBubble"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="font-semibold mb-2 text-sm">Cumulative Risk Reduction — Checked Investments</div>
+          <div style="position:relative; height:300px;"><canvas id="chartStacked"></canvas></div>
+          <div class="text-xs mt-2" style="color:var(--text2);">Check the boxes in the table above to build your stack.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 4 — EXECUTIVE RISK BRIEF
+         =================================================================== -->
+    <div id="tab-brief" class="tab-panel">
+      <h2 class="text-xl font-bold mb-1">📋 Board-Ready Risk Brief — Auto-Generated</h2>
+      <p class="text-sm mb-4" style="color:var(--text2);">Regenerates live from your current slicer selections and any investments checked in the Advisor tab.</p>
+
+      <div class="chart-card mb-5">
+        <div class="font-semibold mb-2 text-sm">Risk Summary</div>
+        <p id="briefSummary" class="text-sm leading-relaxed" style="color:var(--text);">—</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5" id="briefKpiGrid"></div>
+
+      <div class="chart-card mb-5">
+        <div class="font-semibold mb-2 text-sm">Top 3 Recommended Actions</div>
+        <ol class="text-sm list-decimal ml-5 space-y-1" id="briefActions" style="color:var(--text);"></ol>
+      </div>
+
+      <div class="chart-card mb-5" style="overflow-x:auto;">
+        <div class="font-semibold mb-2 text-sm">12-Month Risk Reduction Roadmap</div>
+        <table class="matrix">
+          <thead><tr><th>Quarter</th><th>Action</th><th>Investment</th><th>Expected Risk Reduction</th></tr></thead>
+          <tbody id="briefRoadmap"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-card mb-5">
+        <div class="font-semibold mb-2 text-sm">Financial Impact Summary</div>
+        <p id="briefFinancial" class="text-sm leading-relaxed" style="color:var(--text);">—</p>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="nav-btn" onclick="copyBrief()">📋 Copy Brief</button>
+        <button class="nav-btn" onclick="alert('This would export the brief as a PDF/DOCX in a production build.')">📤 Export</button>
+        <button class="nav-btn" onclick="renderBrief()">🔄 Regenerate with Current Filters</button>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 5 — PYTHON MODEL
+         =================================================================== -->
+    <div id="tab-python" class="tab-panel">
+      <h2 class="text-xl font-bold mb-4">🐍 Python Model — The Math Behind BreachGuard IQ</h2>
+
+      <div class="chart-card mb-5 code-block">
+        <div class="font-semibold mb-2 text-sm">1. Breach Cost Estimation Formula</div>
+        <button class="copy-btn" onclick="copyCode('code1')">Copy</button>
+        <pre><code class="language-python" id="code1">def estimate_breach_cost(global_avg, industry_multiplier, size_multiplier,
+                          region_multiplier, sensitivity_weight, maturity_multiplier):
+    """
+    Estimated breach cost = global baseline x every risk-profile factor.
+    Each multiplier is >1 when it INCREASES cost, <1 when it REDUCES it.
+    """
+    base_cost = global_avg * industry_multiplier * size_multiplier * region_multiplier
+    base_cost *= sensitivity_weight       # PII / financial data raises the stakes
+    base_cost *= maturity_multiplier      # stronger security posture lowers the cost
+    return base_cost
+
+# Example: mid-size technology company, US region, medium sensitivity, 3-star maturity
+cost = estimate_breach_cost(
+    global_avg=4_880_000,
+    industry_multiplier=1.05,
+    size_multiplier=0.85,
+    region_multiplier=2.09,
+    sensitivity_weight=1.0,
+    maturity_multiplier=0.75,
+)
+print(f"Estimated breach cost: ${cost:,.0f}")</code></pre>
+      </div>
+
+      <div class="chart-card mb-5 code-block">
+        <div class="font-semibold mb-2 text-sm">2. Detection Speed Cost Curve</div>
+        <button class="copy-btn" onclick="copyCode('code2')">Copy</button>
+        <pre><code class="language-python" id="code2">def days_cost_multiplier(days):
+    """
+    Cost escalates with dwell time. The curve is roughly flat before the
+    200-day benchmark, then bends sharply upward past it (the "200-day cliff").
+    Anchors: ~0.79x at 200 days ($3.87M / $4.88M), accelerating after.
+    """
+    if days <= 200:
+        return 0.60 + (days / 200) * 0.193   # 0.60x at day 0 -> 0.793x at day 200
+    else:
+        overshoot = (days - 200) / 165        # normalized 0..1 across 200->365
+        return 0.793 + (overshoot ** 1.3) * 0.6
+
+def cost_at_days(profile_base_cost, days, maturity_multiplier):
+    return profile_base_cost * days_cost_multiplier(days) * maturity_multiplier
+
+for d in [90, 200, 247, 365]:
+    print(d, "days ->", round(days_cost_multiplier(d), 3), "x multiplier")</code></pre>
+      </div>
+
+      <div class="chart-card mb-5 code-block">
+        <div class="font-semibold mb-2 text-sm">3. Security Investment ROI Ranking</div>
+        <button class="copy-btn" onclick="copyCode('code3')">Copy</button>
+        <pre><code class="language-python" id="code3">def rank_investments(investments, current_cost):
+    """
+    investments: list of dicts with 'name', 'implementation_cost', 'risk_reduction_pct'
+    Ranks by ROI = (dollar_savings - implementation_cost) / implementation_cost
+    """
+    ranked = []
+    for inv in investments:
+        savings = current_cost * inv["risk_reduction_pct"]
+        roi = (savings - inv["implementation_cost"]) / inv["implementation_cost"]
+        payback_months = inv["implementation_cost"] / (savings / 12) if savings > 0 else float("inf")
+        ranked.append({**inv, "savings": savings, "roi": roi, "payback_months": payback_months})
+    return sorted(ranked, key=lambda x: x["roi"], reverse=True)
+
+best = rank_investments(investments, current_cost)[0]
+print("Best ROI pick:", best["name"], f"ROI={best['roi']:.1%}")</code></pre>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         TAB 6 — CAROUSEL SLIDES
+         =================================================================== -->
+    <div id="tab-carousel" class="tab-panel">
+      <h2 class="text-xl font-bold mb-4">🎞️ LinkedIn Carousel — 6 Slides</h2>
+      <div class="chart-card" style="min-height:420px;">
+        <div class="relative" style="min-height:360px;">
+
+          <div class="slide active flex-col items-center justify-center text-center gap-4" data-slide="1" style="min-height:360px;">
+            <div class="text-5xl">🛡️</div>
+            <div class="text-3xl font-bold" style="color:var(--danger);">$4.88M</div>
+            <div class="text-lg" style="color:var(--text);">That's the average cost of a data breach in 2026.<br>What would yours cost?</div>
+          </div>
+
+          <div class="slide flex-col items-center justify-center text-center gap-4" data-slide="2" style="min-height:360px;">
+            <div class="text-2xl font-bold mb-2">The 3 Hidden Cost Drivers</div>
+            <div class="grid grid-cols-3 gap-4 w-full max-w-lg">
+              <div class="kpi-card kpi-warn"><div class="text-sm">Detection &amp; Escalation</div><div class="text-xl font-bold" style="color:var(--warn);">29%</div></div>
+              <div class="kpi-card kpi-blue"><div class="text-sm">Notification</div><div class="text-xl font-bold" style="color:var(--cat-blue);">6%</div></div>
+              <div class="kpi-card kpi-danger"><div class="text-sm">Lost Business</div><div class="text-xl font-bold" style="color:var(--danger);">38%</div></div>
+            </div>
+          </div>
+
+          <div class="slide flex-col items-center justify-center text-center gap-4" data-slide="3" style="min-height:360px;">
+            <div class="text-2xl font-bold" style="color:var(--danger);">The 200-Day Cliff</div>
+            <div class="text-lg">Why speed matters more than anything.</div>
+            <div class="flex gap-6 mt-2">
+              <div><div class="text-2xl font-bold" style="color:var(--safe);">$3.87M</div><div class="text-xs" style="color:var(--text2);">Contained &lt; 200 days</div></div>
+              <div><div class="text-2xl font-bold" style="color:var(--danger);">$5.01M</div><div class="text-xs" style="color:var(--text2);">Contained &gt; 200 days</div></div>
+            </div>
+          </div>
+
+          <div class="slide flex-col items-center justify-center text-center gap-4" data-slide="4" style="min-height:360px;">
+            <div class="text-2xl font-bold">Live Waterfall Impact</div>
+            <div class="text-lg" style="color:var(--text2);">3 investments stacked together</div>
+            <div class="text-4xl font-bold" style="color:var(--safe);">$2.1M saved</div>
+          </div>
+
+          <div class="slide flex-col items-center justify-center text-center gap-4" data-slide="5" style="min-height:360px;">
+            <div class="text-2xl font-bold">The ROI Ranking Table</div>
+            <div class="text-lg" style="color:var(--text2);">The best security investment isn't what you think.</div>
+            <div class="text-sm" style="color:var(--text);">Hint: it's rarely the most expensive one.</div>
+          </div>
+
+          <div class="slide flex-col items-center justify-center text-center gap-4" data-slide="6" style="min-height:360px;">
+            <div class="text-2xl font-bold" style="color:var(--danger);">Try BreachGuard IQ</div>
+            <div class="text-lg">See your number.</div>
+            <div class="text-sm" style="color:var(--text2);">#CyberSecurity #RiskManagement #DataAnalytics #AI</div>
+          </div>
+
+        </div>
+        <div class="flex items-center justify-between mt-4">
+          <button class="nav-btn" onclick="carouselMove(-1)">← Prev</button>
+          <div class="flex gap-2" id="carouselDots"></div>
+          <button class="nav-btn" onclick="carouselMove(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* =============================================================================
+   BREACHGUARD IQ — APPLICATION LOGIC
+   Everything below is plain vanilla JS. No backend, no build step.
+   Structure:
+     1. Reference data (industry / size / region / sensitivity / maturity factors)
+     2. Application state + the calculation engine
+     3. Chart.js instances + render functions (one per chart)
+     4. Slicer event handlers
+     5. Tab switching, carousel, copy buttons
+     6. Init
+   ============================================================================= */
+
+Chart.register(ChartDataLabels);
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#26324a';
+Chart.defaults.font.family = "Segoe UI, Inter, system-ui, sans-serif";
+
+/* ---------- 1. REFERENCE DATA ---------- */
+const GLOBAL_AVG_COST = 4_880_000; // IBM Cost of a Data Breach Report global average
+
+const INDUSTRY = {
+  healthcare:    { label:'Healthcare',          costMult:1.90, daysMult:1.15, empTypical:15000 },
+  financial:     { label:'Financial Services',  costMult:1.20, daysMult:1.05, empTypical:20000 },
+  technology:    { label:'Technology',          costMult:1.05, daysMult:0.85, empTypical:12000 },
+  retail:        { label:'Retail',              costMult:0.75, daysMult:0.95, empTypical:25000 },
+  manufacturing: { label:'Manufacturing',       costMult:0.85, daysMult:1.00, empTypical:18000 },
+  government:    { label:'Government',          costMult:0.68, daysMult:1.20, empTypical:30000 },
+};
+
+const SIZE = {
+  small:      { label:'Small (<1K)',      costMult:0.60, employees:600,   records:42000   },
+  mid:        { label:'Mid (1K-10K)',     costMult:0.85, employees:5000,  records:280000  },
+  large:      { label:'Large (10K-50K)',  costMult:1.15, employees:25000, records:1800000 },
+  enterprise: { label:'Enterprise (50K+)',costMult:1.60, employees:75000, records:6500000 },
+};
+
+const REGION = {
+  us:      { label:'United States',  costMult:2.09 }, // 10.22M / 4.88M
+  europe:  { label:'Europe',         costMult:0.95 },
+  apac:    { label:'APAC',           costMult:0.80 },
+  global:  { label:'Global Average', costMult:1.00 },
+};
+
+const SENSITIVITY = {
+  low:    { label:'Low (public data)',              weight:0.70, recordsMult:1.30 },
+  medium: { label:'Medium (PII)',                   weight:1.00, recordsMult:1.00 },
+  high:   { label:'High (financial/health records)',weight:1.35, recordsMult:0.75 },
+};
+
+// index 0 = 1-star ... index 4 = 5-star
+const MATURITY_COST_MULT = [1.00, 0.88, 0.75, 0.60, 0.42];
+const MATURITY_DAYS_MULT = [1.25, 1.10, 1.00, 0.82, 0.65];
+const MATURITY_LABELS = ['Minimal — no MFA, no training','Basic protections in place','Moderate maturity','Strong maturity','Advanced — zero-trust, AI security, full encryption'];
+
+const DEFAULT_DAYS = 247; // 2026 global average days to detect & contain
+
+/* Breach cost breakdown (IBM report structure) */
+const COST_BREAKDOWN = [
+  { label:'Detection & Escalation', pct:0.29, color:'#f97316' },
+  { label:'Notification',           pct:0.06, color:'#eab308' },
+  { label:'Post-breach Response',   pct:0.27, color:'#8b5cf6' },
+  { label:'Lost Business',          pct:0.38, color:'#3b82f6' },
+];
+
+/* 8 security investments (base figures for a "mid" size company; scaled by size below) */
+const INVESTMENTS = [
+  { id:'ai',      name:'AI-powered threat detection',            baseCost:250000, reduction:0.35, timeline:'3-6 months',  desc:'Uses machine learning to flag anomalous behavior in real time, cutting both detection time and breach cost by up to $1.9M according to IBM research.' },
+  { id:'train',   name:'Employee security awareness training',   baseCost:45000,  reduction:0.18, timeline:'1-2 months',  desc:'Ongoing phishing simulations and training — human error drives the majority of breaches, so this is often the cheapest lever available.' },
+  { id:'mfa',     name:'Multi-factor authentication rollout',    baseCost:60000,  reduction:0.22, timeline:'1-3 months',  desc:'Blocks the majority of credential-stuffing and phishing-based account takeovers with relatively low implementation cost.' },
+  { id:'zt',      name:'Zero-trust architecture implementation', baseCost:400000, reduction:0.30, timeline:'9-18 months', desc:'Assumes no implicit trust across the network; significantly reduces lateral movement after an initial compromise.' },
+  { id:'ir',      name:'Incident response plan + tabletop exercises', baseCost:80000, reduction:0.20, timeline:'2-4 months', desc:'A rehearsed response plan cuts containment time dramatically, which is the single biggest lever on total cost.' },
+  { id:'enc',     name:'Data encryption at rest and in transit', baseCost:150000, reduction:0.25, timeline:'3-6 months',  desc:'Renders exfiltrated data unusable to attackers, reducing notification scope and regulatory penalties.' },
+  { id:'vendor',  name:'Third-party vendor risk assessment program', baseCost:70000, reduction:0.15, timeline:'2-3 months', desc:'Supply-chain compromises are a fast-growing attack vector; formal vendor assessments close this gap.' },
+  { id:'soc',     name:'24/7 Security Operations Center (SOC)',  baseCost:350000, reduction:0.28, timeline:'4-8 months',  desc:'Continuous monitoring shortens detection time year-round, including nights, weekends and holidays when attacks spike.' },
+];
+
+/* ---------- 2. APPLICATION STATE ---------- */
+const state = {
+  industry: 'technology',
+  size: 'mid',
+  region: 'global',
+  sensitivity: 'medium',
+  maturity: 3,
+  daysSlider: DEFAULT_DAYS,
+  checkedInvestments: new Set(),
+  expandedRow: null,
+  carouselIndex: 0,
+};
+
+/* ---------- Core calculation engine ---------- */
+// "Unmitigated" baseline cost before days-curve and maturity are applied
+function profileBaseCost(){
+  const ind = INDUSTRY[state.industry], sz = SIZE[state.size], rg = REGION[state.region], sn = SENSITIVITY[state.sensitivity];
+  return GLOBAL_AVG_COST * ind.costMult * sz.costMult * rg.costMult * sn.weight;
+}
+
+function daysCostMultiplier(days){
+  if (days <= 200) return 0.60 + (days/200) * 0.193;
+  const overshoot = (days - 200) / 165;
+  return 0.793 + Math.pow(overshoot, 1.3) * 0.6;
+}
+
+function maturityCostMultiplier(){ return MATURITY_COST_MULT[state.maturity-1]; }
+
+function defaultDaysToContain(){
+  const ind = INDUSTRY[state.industry];
+  return DEFAULT_DAYS * ind.daysMult * MATURITY_DAYS_MULT[state.maturity-1];
+}
+
+function currentEstimatedCost(){
+  const days = defaultDaysToContain();
+  return profileBaseCost() * daysCostMultiplier(days) * maturityCostMultiplier();
+}
+
+function recordsAtRisk(){
+  const sz = SIZE[state.size], sn = SENSITIVITY[state.sensitivity];
+  return Math.round(sz.records * sn.recordsMult);
+}
+
+function riskScore(){
+  const cost = currentEstimatedCost();
+  const days = defaultDaysToContain();
+  const costNorm = Math.min(cost / 12_000_000, 1);
+  const daysNorm = Math.min(days / 365, 1);
+  const maturityInverse = 1 - (state.maturity-1)/4;
+  return Math.round(100 * (0.45*costNorm + 0.30*daysNorm + 0.25*maturityInverse));
+}
+
+function sizeCostScale(){
+  // scales investment implementation cost by company size
+  return { small:0.4, mid:1.0, large:2.2, enterprise:4.0 }[state.size];
+}
+
+function fmtM(v){ return '$' + (v/1_000_000).toFixed(v >= 10_000_000 ? 1 : 2) + 'M'; }
+function fmtCompact(n){
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M';
+  if (n >= 1_000) return (n/1_000).toFixed(0)+'K';
+  return String(n);
+}
+
+/* ---------- 3. CHART INSTANCES ---------- */
+let chartDonut, chartIndustryBar, chartGauge, chartScatter, chartDetectionLine, chartWaterfall, chartBubble, chartStacked;
+
+function initCharts(){
+  const gridColor = '#1e293b';
+
+  /* --- Donut: breach cost breakdown --- */
+  chartDonut = new Chart(document.getElementById('chartDonut'), {
+    type:'doughnut',
+    data:{ labels:COST_BREAKDOWN.map(c=>c.label), datasets:[{ data:COST_BREAKDOWN.map(c=>c.pct), backgroundColor:COST_BREAKDOWN.map(c=>c.color), borderColor:'#1a2332', borderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{
+        legend:{ position:'bottom', labels:{ boxWidth:10, font:{size:10}, color:'#94a3b8' } },
+        tooltip:{ callbacks:{ label:(ctx)=>{ const total = currentEstimatedCost(); return ' '+ctx.label+': '+fmtM(total*ctx.parsed); } } },
+        datalabels:{ color:'#0a0e17', font:{weight:'bold', size:11}, formatter:(v)=> (v*100).toFixed(0)+'%' },
+      }
+    },
+    plugins:[{
+      id:'donutCenter',
+      afterDraw(chart){
+        const {ctx, chartArea:{width,height,top,left}} = chart;
+        ctx.save();
+        ctx.font = 'bold 18px Segoe UI'; ctx.fillStyle = '#f1f5f9'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(fmtM(currentEstimatedCost()), left+width/2, top+height/2-8);
+        ctx.font = '10px Segoe UI'; ctx.fillStyle = '#94a3b8';
+        ctx.fillText('Total Est. Cost', left+width/2, top+height/2+12);
+        ctx.restore();
+      }
+    }]
+  });
+
+  /* --- Horizontal bar: cost by industry benchmark --- */
+  chartIndustryBar = new Chart(document.getElementById('chartIndustryBar'), {
+    type:'bar',
+    data:{ labels:Object.values(INDUSTRY).map(i=>i.label), datasets:[{ data:[], backgroundColor:[], borderRadius:4, barThickness:18 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ grid:{color:gridColor}, ticks:{ callback:(v)=>'$'+(v/1_000_000).toFixed(1)+'M' } }, y:{ grid:{display:false} } },
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=> ' '+fmtM(ctx.parsed.x) } },
+        datalabels:{ anchor:'end', align:'end', color:'#f1f5f9', font:{size:10,weight:'bold'}, formatter:(v)=>fmtM(v) }
+      }
+    }
+  });
+
+  /* --- Gauge: half-doughnut, maturity vs cost impact --- */
+  chartGauge = new Chart(document.getElementById('chartGauge'), {
+    type:'doughnut',
+    data:{ labels:['Low','Mid','High'], datasets:[{ data:[40,30,30], backgroundColor:['#059669','#d97706','#dc2626'], borderWidth:0 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'72%', rotation:-90, circumference:180,
+      plugins:{ legend:{display:false}, tooltip:{enabled:false}, datalabels:{display:false} }
+    }
+  });
+
+  /* --- Scatter: company size vs breach cost --- */
+  chartScatter = new Chart(document.getElementById('chartScatter'), {
+    type:'scatter',
+    data:{ datasets:[
+      { label:'Industry benchmarks', data:[], backgroundColor:'#64748b', pointRadius:7, pointHoverRadius:9 },
+      { label:'Your company', data:[], backgroundColor:'#dc2626', pointRadius:10, pointHoverRadius:12 },
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true,text:'Employees',color:'#94a3b8'}, grid:{color:gridColor}, ticks:{ callback:(v)=>fmtCompact(v) } },
+        y:{ title:{display:true,text:'Breach Cost ($M)',color:'#94a3b8'}, grid:{color:gridColor}, ticks:{ callback:(v)=>'$'+v+'M' } },
+      },
+      plugins:{
+        legend:{ position:'bottom', labels:{boxWidth:10, font:{size:10}} },
+        datalabels:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+fmtCompact(ctx.parsed.x)+' employees, $'+ctx.parsed.y.toFixed(2)+'M' } }
+      }
+    }
+  });
+
+  /* --- Line/area: detection speed escalation curve --- */
+  chartDetectionLine = new Chart(document.getElementById('chartDetectionLine'), {
+    type:'line',
+    data:{ labels:[], datasets:[
+      { label:'Cumulative breach cost', data:[], borderColor:'#dc2626', backgroundColor:'rgba(220,38,38,0.08)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 },
+      { label:'Fast benchmark ($3.87M)', data:[], borderColor:'#059669', borderDash:[6,4], pointRadius:0, borderWidth:1.5, fill:false },
+      { label:'Slow benchmark ($5.01M)', data:[], borderColor:'#d97706', borderDash:[6,4], pointRadius:0, borderWidth:1.5, fill:false },
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      scales:{
+        x:{ title:{display:true,text:'Days',color:'#94a3b8'}, grid:{color:gridColor} },
+        y:{ title:{display:true,text:'Cost ($M)',color:'#94a3b8'}, grid:{color:gridColor}, ticks:{ callback:(v)=>'$'+v+'M' } },
+      },
+      plugins:{
+        legend:{ position:'bottom', labels:{boxWidth:10, font:{size:10}} },
+        datalabels:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': $'+ctx.parsed.y.toFixed(2)+'M' } }
+      }
+    }
+  });
+
+  /* --- Waterfall (built from stacked bar: invisible base + visible delta) --- */
+  chartWaterfall = new Chart(document.getElementById('chartWaterfall'), {
+    type:'bar',
+    data:{ labels:[], datasets:[
+      { label:'base', data:[], backgroundColor:'rgba(0,0,0,0)', stack:'s' },
+      { label:'value', data:[], backgroundColor:[], stack:'s', borderRadius:4 },
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      layout:{ padding:{ top:24 } },
+      scales:{ x:{ grid:{display:false} }, y:{ grid:{color:gridColor}, ticks:{ callback:(v)=>'$'+(v/1_000_000).toFixed(1)+'M' } } },
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{
+          title:(items)=>items[0].label,
+          label:(ctx)=>{ if(ctx.dataset.label==='base') return null; const dp = ctx.chart.$wfDeltas[ctx.dataIndex]; return dp; }
+        } },
+        datalabels:{
+          display:(ctx)=> ctx.datasetIndex===1,
+          color:'#f1f5f9', font:{weight:'bold',size:10}, anchor:'end', align:'end',
+          formatter:(v,ctx)=> ctx.chart.$wfLabels ? ctx.chart.$wfLabels[ctx.dataIndex] : ''
+        }
+      }
+    }
+  });
+
+  /* --- Bubble: cost vs risk reduction vs ROI --- */
+  chartBubble = new Chart(document.getElementById('chartBubble'), {
+    type:'bubble',
+    data:{ datasets:[{ data:[], backgroundColor:[] }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true,text:'Implementation Cost',color:'#94a3b8'}, grid:{color:gridColor}, ticks:{ callback:(v)=>'$'+fmtCompact(v) } },
+        y:{ title:{display:true,text:'Risk Reduction %',color:'#94a3b8'}, grid:{color:gridColor}, ticks:{ callback:(v)=>v+'%' } },
+      },
+      plugins:{
+        legend:{display:false},
+        datalabels:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=>{ const d=ctx.raw; return d.name+': $'+fmtCompact(d.x)+', '+d.y+'% reduction, ROI '+d.roi.toFixed(0)+'%'; } } }
+      }
+    }
+  });
+
+  /* --- Stacked bar: cumulative risk reduction from checked investments --- */
+  chartStacked = new Chart(document.getElementById('chartStacked'), {
+    type:'bar',
+    data:{ labels:['Your Risk'], datasets:[] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ stacked:true, min:0, max:100, grid:{color:gridColor}, ticks:{ callback:(v)=>v+'%' } }, y:{ stacked:true, grid:{display:false} } },
+      plugins:{
+        legend:{ position:'bottom', labels:{boxWidth:10, font:{size:10}} },
+        datalabels:{ color:'#0a0e17', font:{weight:'bold',size:10}, formatter:(v)=> v>6 ? v.toFixed(0)+'%' : '' },
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+ctx.parsed.x.toFixed(1)+'%' } }
+      }
+    }
+  });
+}
+
+/* ---------- Render functions ---------- */
+function renderKpis(){
+  const cost = currentEstimatedCost();
+  const days = defaultDaysToContain();
+  const industryAvgCost = GLOBAL_AVG_COST * INDUSTRY[state.industry].costMult;
+  const vsIndustry = ((cost - industryAvgCost) / industryAvgCost) * 100;
+
+  document.getElementById('kpiCost').textContent = fmtM(cost);
+  const trendEl = document.getElementById('kpiCostTrend');
+  trendEl.textContent = (vsIndustry>=0?'↑ ':'↓ ') + Math.abs(vsIndustry).toFixed(0) + '% vs industry avg';
+  trendEl.className = 'pill ' + (vsIndustry>=0 ? 'pill-up':'pill-down');
+
+  document.getElementById('kpiDays').textContent = Math.round(days) + ' days';
+  const daysTrendEl = document.getElementById('kpiDaysTrend');
+  const daysDiff = Math.round(days) - 200;
+  daysTrendEl.textContent = (daysDiff>=0?'+':'') + daysDiff + ' vs 200-day benchmark';
+  daysTrendEl.className = 'pill ' + (daysDiff>=0 ? 'pill-up':'pill-down');
+
+  document.getElementById('kpiRecords').textContent = recordsAtRisk().toLocaleString('en-US');
+
+  const risk = riskScore();
+  const riskEl = document.getElementById('kpiRisk');
+  riskEl.textContent = risk;
+  let riskColor = '#059669', riskLabel='Low risk';
+  if (risk>70){ riskColor='#dc2626'; riskLabel='High risk'; }
+  else if (risk>=40){ riskColor='#d97706'; riskLabel='Moderate risk'; }
+  riskEl.style.color = riskColor;
+  document.getElementById('kpiRiskLabel').textContent = riskLabel;
+}
+
+function renderDonut(){
+  chartDonut.update();
+}
+
+function renderIndustryBar(){
+  const cost = currentEstimatedCost();
+  const days = defaultDaysToContain();
+  const labels = [], values = [], colors = [];
+  Object.entries(INDUSTRY).forEach(([key, ind])=>{
+    const c = GLOBAL_AVG_COST * ind.costMult * SIZE[state.size].costMult * REGION[state.region].costMult * SENSITIVITY[state.sensitivity].weight
+              * daysCostMultiplier(DEFAULT_DAYS * ind.daysMult * MATURITY_DAYS_MULT[state.maturity-1]) * maturityCostMultiplier();
+    values.push(c);
+    colors.push(key===state.industry ? '#dc2626' : '#475569');
+  });
+  chartIndustryBar.data.datasets[0].data = values;
+  chartIndustryBar.data.datasets[0].backgroundColor = colors;
+  chartIndustryBar.update();
+}
+
+function renderGauge(){
+  const pct = ((state.maturity-1)/4) * 100; // 0..100
+  const angle = -90 + (pct/100)*180; // -90deg .. +90deg
+  document.getElementById('gaugeNeedle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
+  const costAtMax = profileBaseCost() * daysCostMultiplier(defaultDaysToContain()) * MATURITY_COST_MULT[4];
+  const costAtMin = profileBaseCost() * daysCostMultiplier(defaultDaysToContain()) * MATURITY_COST_MULT[0];
+  document.getElementById('gaugeCaption').textContent =
+    `${state.maturity}★ maturity → ${fmtM(currentEstimatedCost())} (vs ${fmtM(costAtMin)} at 1★, ${fmtM(costAtMax)} at 5★)`;
+}
+
+function renderScatter(){
+  const benchmarks = Object.values(INDUSTRY).map(ind=>{
+    const c = GLOBAL_AVG_COST * ind.costMult * REGION[state.region].costMult * SENSITIVITY[state.sensitivity].weight
+              * daysCostMultiplier(DEFAULT_DAYS * ind.daysMult) * 0.75; // assume mid maturity for a neutral benchmark
+    return { x: ind.empTypical, y: +(c/1_000_000).toFixed(2) };
+  });
+  chartScatter.data.datasets[0].data = benchmarks;
+  chartScatter.data.datasets[1].data = [{ x: SIZE[state.size].employees, y: +(currentEstimatedCost()/1_000_000).toFixed(2) }];
+  chartScatter.update();
+}
+
+function renderDetectionTab(){
+  const days = state.daysSlider;
+  document.getElementById('daysSliderVal').textContent = days;
+  const base = profileBaseCost();
+  const mat = maturityCostMultiplier();
+
+  const labels=[], curve=[], fastLine=[], slowLine=[];
+  for(let d=10; d<=365; d+=5){
+    labels.push(d);
+    curve.push(+(base*daysCostMultiplier(d)*mat/1_000_000).toFixed(3));
+    fastLine.push(3.87);
+    slowLine.push(5.01);
+  }
+  chartDetectionLine.data.labels = labels;
+  chartDetectionLine.data.datasets[0].data = curve;
+  chartDetectionLine.data.datasets[1].data = fastLine;
+  chartDetectionLine.data.datasets[2].data = slowLine;
+  chartDetectionLine.update();
+
+  const costCurrent = base * daysCostMultiplier(days) * mat;
+  const cost200 = base * daysCostMultiplier(200) * mat;
+  const cost90 = base * daysCostMultiplier(90) * mat;
+
+  document.getElementById('kpiSpeedCurrent').textContent = fmtM(costCurrent);
+  document.getElementById('kpiSpeed200').textContent = fmtM(cost200);
+  document.getElementById('kpiSpeed90').textContent = fmtM(cost90);
+  document.getElementById('kpiSpeed200Save').textContent = costCurrent>cost200 ? ('Saves '+fmtM(costCurrent-cost200)) : ('Costs '+fmtM(cost200-costCurrent)+' more');
+  document.getElementById('kpiSpeed90Save').textContent = costCurrent>cost90 ? ('Saves '+fmtM(costCurrent-cost90)) : ('Costs '+fmtM(cost90-costCurrent)+' more');
+
+  renderWaterfall(costCurrent, base, mat);
+}
+
+function renderWaterfall(startCost, base, mat){
+  const afterDetection = base * daysCostMultiplier(90) * mat; // faster detection lever
+  const aiReductionRaw = afterDetection * 0.25;
+  const aiReduction = Math.min(aiReductionRaw, 1_900_000); // AI security caps at $1.9M per IBM report
+  const afterAI = afterDetection - aiReduction;
+  const trainingReduction = afterAI * 0.08;
+  const afterTraining = afterAI - trainingReduction;
+
+  const steps = [
+    { label:'Current Cost', value:startCost, type:'total' },
+    { label:'Faster Detection', value:-(startCost-afterDetection), type:'down' },
+    { label:'AI Security Tools', value:-aiReduction, type:'down' },
+    { label:'Staff Training', value:-trainingReduction, type:'down' },
+    { label:'Optimized Cost', value:afterTraining, type:'total' },
+  ];
+
+  let running = 0;
+  const bases=[], values=[], colors=[], labels=[], deltas=[];
+  steps.forEach(s=>{
+    labels.push(s.label);
+    if (s.type==='total'){
+      bases.push(0); values.push(s.value); colors.push('#3b82f6');
+      deltas.push(fmtM(s.value)); running = s.value;
+    } else {
+      const newRunning = running + s.value;
+      bases.push(Math.min(running,newRunning)); values.push(Math.abs(s.value));
+      colors.push('#059669');
+      deltas.push((s.value<0?'-':'+')+fmtM(Math.abs(s.value)));
+      running = newRunning;
+    }
+  });
+  chartWaterfall.data.labels = labels;
+  chartWaterfall.data.datasets[0].data = bases;
+  chartWaterfall.data.datasets[1].data = values;
+  chartWaterfall.data.datasets[1].backgroundColor = colors;
+  chartWaterfall.$wfDeltas = deltas;
+  chartWaterfall.$wfLabels = deltas;
+  // Give the tallest bar's data label room to breathe above the plot area.
+  const tallest = Math.max(...bases.map((b,i)=> b + values[i]));
+  chartWaterfall.options.scales.y.suggestedMax = tallest * 1.18;
+  chartWaterfall.update();
+}
+
+/* ---------- Tab 3: Advisor ---------- */
+function getInvestmentsForProfile(){
+  const cost = currentEstimatedCost();
+  const scale = sizeCostScale();
+  return INVESTMENTS.map(inv=>{
+    const implCost = inv.baseCost * scale;
+    const savings = cost * inv.reduction;
+    const roi = ((savings - implCost) / implCost) * 100;
+    const paybackMonths = savings>0 ? (implCost / (savings/12)) : Infinity;
+    return { ...inv, implCost, savings, roi, paybackMonths };
+  }).sort((a,b)=> b.roi - a.roi);
+}
+
+function renderAdvisorTab(){
+  const ranked = getInvestmentsForProfile();
+  const best = ranked[0];
+  document.getElementById('bestRoiName').textContent = best.name;
+  document.getElementById('bestRoiDetail').textContent =
+    `${(best.reduction*100).toFixed(0)}% risk reduction · ${fmtM(best.savings)} saved · ROI ${best.roi.toFixed(0)}% · payback ${best.paybackMonths.toFixed(1)} months`;
+
+  const tbody = document.getElementById('investmentTbody');
+  tbody.innerHTML = '';
+  ranked.forEach((inv, idx)=>{
+    const tr = document.createElement('tr');
+    tr.className = 'invest-row';
+    const checked = state.checkedInvestments.has(inv.id) ? 'checked' : '';
+    const bestTag = idx===0 ? '<span class="best-badge ml-2">BEST ROI</span>' : '';
+
+    const tdCheck = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox'; checkbox.checked = state.checkedInvestments.has(inv.id);
+    checkbox.onclick = (e)=>{ e.stopPropagation(); toggleInvestment(inv.id); };
+    tdCheck.appendChild(checkbox);
+
+    const tdName = document.createElement('td');
+    tdName.innerHTML = '<span style="font-weight:600;"></span>' + bestTag;
+    tdName.querySelector('span').textContent = inv.name;
+
+    const tdCost = document.createElement('td'); tdCost.textContent = '$'+fmtCompact(inv.implCost);
+    const tdReduction = document.createElement('td'); tdReduction.textContent = (inv.reduction*100).toFixed(0)+'%';
+    const tdSavings = document.createElement('td'); tdSavings.textContent = fmtM(inv.savings);
+    const tdRoi = document.createElement('td'); tdRoi.style.color = inv.roi>=0 ? '#6ee7b7':'#fca5a5'; tdRoi.textContent = inv.roi.toFixed(0)+'%';
+    const tdPayback = document.createElement('td'); tdPayback.textContent = isFinite(inv.paybackMonths) ? inv.paybackMonths.toFixed(1)+' mo' : '—';
+
+    tr.append(tdCheck, tdName, tdCost, tdReduction, tdSavings, tdRoi, tdPayback);
+    tr.onclick = ()=> toggleExpandRow(inv.id);
+    tbody.appendChild(tr);
+
+    if (state.expandedRow === inv.id){
+      const detailTr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 7;
+      td.style.background = '#0f172a';
+      td.innerHTML = `
+        <div class="text-sm mb-2" style="color:var(--text2);"></div>
+        <div class="text-xs mb-2" style="color:var(--text2);">Implementation timeline: <span style="color:var(--text);"></span></div>
+        <div class="flex items-end gap-2" style="height:60px;">
+          <div style="width:40px;background:#475569;height:100%;border-radius:4px 4px 0 0;" title="Before"></div>
+          <div style="width:40px;background:#059669;height:${100-inv.reduction*100}%;border-radius:4px 4px 0 0;" title="After"></div>
+          <div class="text-xs" style="color:var(--text2);">Risk score: before vs. after this investment</div>
+        </div>`;
+      td.querySelector('div').textContent = inv.desc;
+      td.querySelectorAll('div')[1].querySelector('span').textContent = inv.timeline;
+      detailTr.appendChild(td);
+      tbody.appendChild(detailTr);
+    }
+  });
+
+  renderBubble(ranked);
+  renderStacked(ranked);
+}
+
+function toggleInvestment(id){
+  if (state.checkedInvestments.has(id)) state.checkedInvestments.delete(id);
+  else state.checkedInvestments.add(id);
+  renderAdvisorTab();
+}
+function toggleExpandRow(id){
+  state.expandedRow = state.expandedRow===id ? null : id;
+  renderAdvisorTab();
+}
+
+function renderBubble(ranked){
+  const valueScore = (inv)=> inv.reduction / (inv.implCost/1_000_000); // reduction per $M — used to flag "best value"
+  const scores = ranked.map(valueScore);
+  const topThreshold = [...scores].sort((a,b)=>b-a)[1]; // top-2 value bubbles highlighted
+  const data = ranked.map(inv=>({
+    x: inv.implCost, y: +(inv.reduction*100).toFixed(0), r: Math.max(6, Math.min(26, Math.sqrt(Math.max(inv.roi,1))*1.8)),
+    roi: inv.roi, name: inv.name, best: valueScore(inv) >= topThreshold
+  }));
+  chartBubble.data.datasets[0].data = data;
+  chartBubble.data.datasets[0].backgroundColor = data.map(d=> d.best ? 'rgba(5,150,105,0.75)' : 'rgba(100,116,139,0.55)');
+  chartBubble.update();
+}
+
+function renderStacked(ranked){
+  const checked = ranked.filter(inv=> state.checkedInvestments.has(inv.id));
+  const palette = ['#3b82f6','#8b5cf6','#f97316','#eab308','#059669','#dc2626','#64748b','#d97706'];
+  let remaining = 100;
+  const datasets = [];
+  checked.forEach((inv, i)=>{
+    const applied = Math.min(remaining, remaining * inv.reduction);
+    datasets.push({ label:inv.name, data:[applied], backgroundColor: palette[i % palette.length] });
+    remaining -= applied;
+  });
+  datasets.push({ label:'Remaining Risk', data:[Math.max(remaining,0)], backgroundColor:'#26324a' });
+  chartStacked.data.datasets = datasets;
+  chartStacked.update();
+}
+
+/* ---------- Tab 4: Executive Brief ---------- */
+function renderBrief(){
+  const cost = currentEstimatedCost();
+  const days = defaultDaysToContain();
+  const risk = riskScore();
+  const records = recordsAtRisk();
+  const avoidableCost = days>200 ? (profileBaseCost()*(daysCostMultiplier(days)-daysCostMultiplier(200))*maturityCostMultiplier()) : 0;
+
+  document.getElementById('briefSummary').textContent =
+    `${INDUSTRY[state.industry].label} company with ${SIZE[state.size].label.toLowerCase()} employees in ${REGION[state.region].label} carries an estimated breach exposure of ${fmtM(cost)}. `+
+    `Current detection speed of ${Math.round(days)} days ${days>200?'exceeds':'is within'} the 200-day benchmark, `+
+    (days>200 ? `adding roughly ${fmtM(avoidableCost)} in avoidable cost.` : `keeping cost well below the slow-containment benchmark.`);
+
+  const grid = document.getElementById('briefKpiGrid');
+  grid.innerHTML = '';
+  const items = [
+    { label:'Estimated Breach Cost', value:fmtM(cost), cls:'kpi-danger', color:'var(--danger)' },
+    { label:'Days to Contain', value:Math.round(days)+' days', cls:'kpi-warn', color:'var(--warn)' },
+    { label:'Records at Risk', value:records.toLocaleString('en-US'), cls:'kpi-blue', color:'var(--cat-blue)' },
+    { label:'Risk Score', value:String(risk), cls:'kpi-safe', color:'var(--safe)' },
+  ];
+  items.forEach(it=>{
+    const div = document.createElement('div');
+    div.className = 'kpi-card '+it.cls;
+    div.innerHTML = `<div class="text-xs" style="color:var(--text2);"></div><div class="text-2xl font-bold mt-1" style="color:${it.color};"></div>`;
+    div.querySelector('.text-xs').textContent = it.label;
+    div.querySelector('.text-2xl').textContent = it.value;
+    grid.appendChild(div);
+  });
+
+  const ranked = getInvestmentsForProfile();
+  const checkedList = ranked.filter(i=>state.checkedInvestments.has(i.id));
+  const top3 = (checkedList.length ? checkedList : ranked).slice(0,3);
+  const actionsEl = document.getElementById('briefActions');
+  actionsEl.innerHTML = '';
+  top3.forEach(inv=>{
+    const li = document.createElement('li');
+    li.textContent = `${inv.name} — ${(inv.reduction*100).toFixed(0)}% risk reduction, ${fmtM(inv.savings)} savings, ROI ${inv.roi.toFixed(0)}%`;
+    actionsEl.appendChild(li);
+  });
+
+  const roadmap = document.getElementById('briefRoadmap');
+  roadmap.innerHTML = '';
+  const quarters = ['Q1','Q2','Q3','Q4'];
+  const roadmapItems = top3.length ? top3 : ranked.slice(0,4);
+  quarters.forEach((q, i)=>{
+    const inv = roadmapItems[i % roadmapItems.length];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+    tr.children[0].textContent = q;
+    tr.children[1].textContent = inv.name;
+    tr.children[2].textContent = '$'+fmtCompact(inv.implCost);
+    tr.children[3].textContent = (inv.reduction*100).toFixed(0)+'%';
+    roadmap.appendChild(tr);
+  });
+
+  const totalInvestment = top3.reduce((s,i)=>s+i.implCost,0);
+  const totalSavings = top3.reduce((s,i)=>s+i.savings,0);
+  const netBenefit = totalSavings - totalInvestment;
+  document.getElementById('briefFinancial').textContent =
+    `Total investment required: ${fmtM(totalInvestment)}. Total risk reduction value: ${fmtM(totalSavings)}. Net benefit: ${fmtM(netBenefit)}.`;
+}
+
+function copyBrief(){
+  const parts = [
+    document.getElementById('briefSummary').textContent,
+    '',
+    'Key Metrics:',
+    ...[...document.getElementById('briefKpiGrid').children].map(c=> c.querySelector('.text-xs').textContent+': '+c.querySelector('.text-2xl').textContent),
+    '',
+    'Top 3 Recommended Actions:',
+    ...[...document.getElementById('briefActions').children].map((li,i)=> (i+1)+'. '+li.textContent),
+    '',
+    document.getElementById('briefFinancial').textContent,
+  ];
+  const text = parts.join('\n');
+  navigator.clipboard.writeText(text).then(()=> alert('Brief copied to clipboard.')).catch(()=> alert('Could not copy — your browser may be blocking clipboard access.'));
+}
+
+/* ---------- 4. SLICER HANDLERS ---------- */
+function onSlicerChange(){
+  state.industry = document.getElementById('slicerIndustry').value;
+  state.size = document.getElementById('slicerSize').value;
+  state.region = document.getElementById('slicerRegion').value;
+  renderAll();
+}
+
+function setSensitivity(val){
+  state.sensitivity = val;
+  document.querySelectorAll('#slicerSensitivity .radio-row').forEach(el=>{
+    el.classList.toggle('active', el.dataset.val===val);
+  });
+  renderAll();
+}
+
+function setMaturity(val){
+  state.maturity = val;
+  document.querySelectorAll('#slicerMaturity .star').forEach(s=>{
+    s.classList.toggle('filled', Number(s.dataset.v) <= val);
+  });
+  document.getElementById('maturityCaption').textContent = val+' / 5 — '+MATURITY_LABELS[val-1];
+  renderAll();
+}
+
+function resetFilters(){
+  document.getElementById('slicerIndustry').value = 'technology';
+  document.getElementById('slicerSize').value = 'mid';
+  document.getElementById('slicerRegion').value = 'global';
+  state.industry='technology'; state.size='mid'; state.region='global';
+  setSensitivity('medium');
+  setMaturity(3);
+  state.daysSlider = DEFAULT_DAYS;
+  document.getElementById('daysSlider').value = DEFAULT_DAYS;
+  state.checkedInvestments.clear();
+  state.expandedRow = null;
+  renderAll();
+}
+
+function onDaysSlider(){
+  state.daysSlider = Number(document.getElementById('daysSlider').value);
+  renderDetectionTab();
+}
+
+/* ---------- 5. TAB SWITCHING, CAROUSEL, COPY ---------- */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=> p.classList.toggle('active', p.id==='tab-'+name));
+  if (name==='brief') renderBrief();
+  if (name==='python') setTimeout(()=> Prism.highlightAll(), 0);
+  // Charts created while their tab was hidden (display:none) get measured at
+  // 0x0 by Chart.js and never draw — force a resize once the tab is visible.
+  requestAnimationFrame(()=>{
+    [chartDonut, chartIndustryBar, chartGauge, chartScatter, chartDetectionLine, chartWaterfall, chartBubble, chartStacked]
+      .forEach(c=> c && c.resize());
+  });
+}
+
+function carouselMove(dir){
+  const slides = document.querySelectorAll('#tab-carousel .slide');
+  state.carouselIndex = (state.carouselIndex + dir + slides.length) % slides.length;
+  renderCarousel();
+}
+function goToSlide(i){ state.carouselIndex = i; renderCarousel(); }
+function renderCarousel(){
+  const slides = document.querySelectorAll('#tab-carousel .slide');
+  slides.forEach((s,i)=> s.classList.toggle('active', i===state.carouselIndex));
+  const dots = document.getElementById('carouselDots');
+  dots.innerHTML = '';
+  slides.forEach((s,i)=>{
+    const dot = document.createElement('span');
+    dot.style.cssText = `width:8px;height:8px;border-radius:50%;display:inline-block;cursor:pointer;background:${i===state.carouselIndex?'#dc2626':'#26324a'};`;
+    dot.onclick = ()=> goToSlide(i);
+    dots.appendChild(dot);
+  });
+}
+
+function copyCode(id){
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(()=> alert('Code copied to clipboard.')).catch(()=> alert('Could not copy — your browser may be blocking clipboard access.'));
+}
+
+/* ---------- 6. RENDER ALL + INIT ---------- */
+function renderAll(){
+  renderKpis();
+  renderDonut();
+  renderIndustryBar();
+  renderGauge();
+  renderScatter();
+  renderDetectionTab();
+  renderAdvisorTab();
+  renderBrief();
+}
+
+function init(){
+  // Chart.js permanently mis-sizes a chart that is constructed while its
+  // canvas sits inside a display:none tab panel (0x0 at creation time, and
+  // a later .resize() cannot recover it). Show every panel just long enough
+  // to construct the charts with real dimensions, then restore the normal
+  // single-active-tab view.
+  document.querySelectorAll('.tab-panel').forEach(p=> p.classList.add('active'));
+  initCharts();
+  document.querySelectorAll('.tab-panel').forEach(p=> p.classList.toggle('active', p.id==='tab-overview'));
+
+  setMaturity(3);
+  renderCarousel();
+  renderAll();
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

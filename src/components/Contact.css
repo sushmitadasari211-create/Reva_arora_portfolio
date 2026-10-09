@@ -1,0 +1,200 @@
+.contact {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  min-height: 100svh;
+  padding-top: 128px;
+  font-family: var(--font-body);
+  background:
+    radial-gradient(60% 50% at 20% 10%, rgba(169, 111, 121, 0.28) 0%, transparent 70%),
+    radial-gradient(50% 60% at 90% 90%, rgba(184, 121, 132, 0.18) 0%, transparent 70%),
+    var(--night);
+}
+
+/* Huge editorial title, drifting behind the card on scroll. */
+.contact__title {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: flex;
+  justify-content: center;
+  padding-top: clamp(40px, 6vh, 64px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.contact__title span {
+  font-family: var(--font-display);
+  font-size: 23vw;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+  user-select: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 245, 247, 0.95) 0%,
+    rgba(230, 188, 196, 0.55) 55%,
+    rgba(169, 111, 121, 0.05) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.contact__card-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.contact__card {
+  width: min(100%, 75%);
+  padding: clamp(32px, 5vw, 64px);
+  box-sizing: border-box;
+  color: #ffffff;
+  border-top-left-radius: 36px;
+  background: linear-gradient(135deg, rgba(184, 121, 132, 0.94) 0%, rgba(169, 111, 121, 0.97) 60%, rgba(138, 90, 101, 0.98) 100%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 -20px 60px rgba(169, 111, 121, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.contact__eyebrow {
+  margin-bottom: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.contact__heading {
+  max-width: 640px;
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 3.8vw, 52px);
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+}
+
+.contact__heading em {
+  font-weight: 700;
+  color: var(--blush-2);
+}
+
+.contact__sub {
+  margin: 0 0 clamp(32px, 5vh, 48px);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.contact__channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact__channel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  text-decoration: none;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  transition:
+    background 300ms ease,
+    color 300ms ease,
+    box-shadow 300ms ease,
+    transform 300ms var(--ease-out);
+}
+
+.contact__channel:hover,
+.contact__channel:focus-visible {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(43, 29, 34, 0.3);
+  transform: translateY(-2px);
+}
+
+.contact__channel-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.contact__channel-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.contact__channel-text small {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.contact__channel-text span {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact__channel-arrow {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  transition: transform 300ms var(--ease-out);
+}
+
+.contact__channel:hover .contact__channel-arrow {
+  transform: translateX(4px);
+}
+
+@media (max-width: 1024px) {
+  .contact__card {
+    width: min(100%, 88%);
+  }
+}
+
+@media (max-width: 760px) {
+  .contact__card {
+    width: 100%;
+    border-top-right-radius: 36px;
+  }
+
+  .contact__channels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact__title {
+    transform: none !important;
+  }
+
+  .contact__channel,
+  .contact__channel-arrow {
+    transition: none;
+  }
+}

@@ -1,0 +1,319 @@
+.about {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(96px, 12vh, 140px) clamp(20px, 5vw, 48px) clamp(150px, 18vh, 200px);
+  font-family: var(--font-body);
+  color: var(--ink);
+  background:
+    radial-gradient(60% 70% at 30% 40%, rgba(255, 255, 255, 0.95) 0%, transparent 70%),
+    radial-gradient(circle at 50% 30%, var(--blush-1) 0%, var(--blush-2) 55%, var(--blush-3) 100%);
+}
+
+.about__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(48px, 7vw, 96px);
+}
+
+/* ---- badge ---- */
+
+.about__badge-col {
+  flex: none;
+  width: min(100%, 320px);
+  display: flex;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.about__badge-drop {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+}
+
+/* Swings down from above and settles, like the original's drop-bounce. */
+.about__badge-drop[data-reveal='drop'] {
+  opacity: 0;
+  transform: translateY(-160px);
+  transition:
+    opacity 500ms ease,
+    transform 1300ms cubic-bezier(0.34, 1.45, 0.5, 1);
+}
+
+.about__badge-drop[data-revealed] {
+  opacity: 1;
+  transform: none;
+}
+
+.about__lanyard {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  width: 14px;
+  height: 240px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0 2px,
+      transparent 2px 8px
+    ),
+    var(--rose-gradient);
+  box-shadow: inset 0 0 4px rgba(43, 29, 34, 0.25);
+}
+
+.about__clip {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  z-index: 2;
+  width: 24px;
+  height: 46px;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f7f1f2 0%, #d9cdd0 100%);
+  border: 1px solid #cdbfc3;
+  box-shadow: 0 2px 10px rgba(43, 29, 34, 0.25);
+}
+
+.about__badge {
+  position: relative;
+  z-index: 1;
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  outline: 1px solid rgba(169, 111, 121, 0.2);
+  box-shadow:
+    0 30px 60px rgba(120, 60, 70, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: rotate(-3deg);
+  transition: transform 600ms var(--ease-out);
+}
+
+.about__badge:hover {
+  transform: rotate(0deg);
+}
+
+.about__badge-slot {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 24px;
+  transform: translateX(-50%);
+  border-radius: 12px 12px 0 0;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.about__badge-slot span {
+  width: 32px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(169, 111, 121, 0.25);
+  box-shadow: inset 0 1px 2px rgba(43, 29, 34, 0.2);
+}
+
+.about__photo {
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--blush-2);
+}
+
+.about__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 48% 30%;
+}
+
+.about__badge-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 4px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.about__badge-meta span:first-child {
+  color: var(--ink);
+}
+
+/* ---- content ---- */
+
+.about__content {
+  flex: 1;
+  min-width: 0;
+  padding-top: 24px;
+}
+
+.about__eyebrow {
+  display: inline-block;
+  margin-bottom: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--rose-deep);
+}
+
+.about__title {
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5vw, 68px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-shadow: 0 2px 20px rgba(169, 111, 121, 0.12);
+}
+
+.about__title span {
+  font-style: italic;
+  color: var(--rose);
+}
+
+.about__text {
+  max-width: 640px;
+  margin: 0;
+  font-size: clamp(17px, 1.45vw, 20px);
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.about__facts {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+  margin: 34px 0 0;
+}
+
+.about__facts div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(169, 111, 121, 0.2);
+}
+
+.about__facts dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rose-deep);
+  padding-top: 3px;
+}
+
+.about__facts dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+/* ---- decoration ---- */
+
+.about__divider {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  z-index: 3;
+  width: 100%;
+  height: clamp(48px, 7vw, 84px);
+  fill: var(--blush-0);
+  pointer-events: none;
+}
+
+.about__sparkle {
+  position: absolute;
+  z-index: -1;
+  fill: var(--rose);
+  opacity: 0.22;
+  pointer-events: none;
+  animation: about-twinkle 3.2s ease-in-out infinite;
+}
+
+.about__sparkle--top {
+  top: clamp(90px, 12vh, 120px);
+  right: clamp(24px, 8vw, 120px);
+  width: 64px;
+  height: 64px;
+}
+
+.about__sparkle--bottom {
+  bottom: clamp(110px, 16vh, 150px);
+  left: clamp(16px, 5vw, 80px);
+  width: 80px;
+  height: 80px;
+  animation-delay: 1s;
+}
+
+@keyframes about-twinkle {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scale(0.92) rotate(0deg);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.05) rotate(12deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .about__inner {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .about__badge-col {
+    padding-top: 64px;
+  }
+
+  .about__content {
+    text-align: center;
+  }
+
+  .about__text,
+  .about__facts {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .about__facts {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about__badge-drop[data-reveal='drop'] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .about__sparkle {
+    animation: none;
+  }
+
+  .about__badge {
+    transition: none;
+  }
+}

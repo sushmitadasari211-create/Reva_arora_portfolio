@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Control Tower &mdash; Fulfillment Command Center</title>
+<meta name="description" content="A dense, Razorpay-style operations control tower: OTIF, delays, inventory risk and warehouse health in one view.">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+/* =====================================================================
+   DESIGN TOKENS -- light, warm neutral, blue/green/orange/red accents
+   ===================================================================== */
+:root{
+  --page:            #f5f4f0;
+  --sidebar-bg:      #ffffff;
+  --surface-1:       #ffffff;
+  --surface-2:       #f1efe9;
+  --surface-3:       #e9ebef;
+  --text-primary:    #1c1f26;
+  --text-secondary:  #565c66;
+  --text-muted:      #8a8f99;
+  --border:          rgba(28,31,38,0.08);
+  --border-strong:   rgba(28,31,38,0.15);
+  --grid-line:       #e7e5df;
+  --baseline:        #ccccd1;
+
+  --series-1: #2F6FED; /* blue    */
+  --series-2: #16A37A; /* green   */
+  --series-3: #F59E0B; /* amber   */
+  --series-4: #7C5CFC; /* purple  */
+  --series-5: #EF4444; /* red     */
+  --series-6: #06AED4; /* cyan    */
+  --series-7: #F472B6; /* pink    */
+  --series-8: #B45309; /* brown   */
+
+  --status-good:     #16A37A;
+  --status-warning:  #F59E0B;
+  --status-serious:  #F97316;
+  --status-critical: #EF4444;
+
+  --accent: #2F6FED;
+  --accent-ink: #ffffff;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-rest: 0 1px 2px rgba(28,31,38,0.06);
+  --shadow-hover: 0 16px 36px rgba(28,31,38,0.12), 0 2px 8px rgba(28,31,38,0.08);
+  --ease: cubic-bezier(.2,.7,.3,1);
+}
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0; background:var(--page); color:var(--text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size:14.5px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,p{ margin:0; }
+button{ font-family:inherit; }
+.kicker{ font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); }
+
+/* =====================================================================
+   APP SHELL
+   ===================================================================== */
+.shell{ display:flex; min-height:100vh; }
+.sidebar{ width:232px; flex:none; background:var(--sidebar-bg); border-right:1px solid var(--border); position:sticky; top:0; height:100vh; overflow-y:auto; display:flex; flex-direction:column; }
+.side-brand{ display:flex; align-items:center; gap:10px; padding:20px 18px 16px; }
+.side-brand .mark{ width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg, var(--series-1), var(--series-2)); display:grid; place-items:center; flex:none; }
+.side-brand .mark svg{ width:16px; height:16px; }
+.side-brand .name{ font-weight:750; font-size:15px; letter-spacing:-0.01em; }
+.side-brand .sub{ font-size:10.5px; color:var(--text-muted); }
+.side-nav{ padding:8px 10px; display:flex; flex-direction:column; gap:2px; flex:1; }
+.side-link{ display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:var(--radius-sm); color:var(--text-secondary); text-decoration:none; font-size:13px; font-weight:600; cursor:pointer; border-left:3px solid transparent; transition:background .15s, color .15s; }
+.side-link svg{ width:17px; height:17px; flex:none; }
+.side-link:hover{ background:var(--surface-2); color:var(--text-primary); }
+.side-link.active{ background:color-mix(in srgb, var(--accent) 10%, transparent); color:var(--accent); border-left-color:var(--accent); }
+.side-foot{ padding:16px 18px; border-top:1px solid var(--border); font-size:10.5px; color:var(--text-muted); line-height:1.6; }
+.main-col{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+/* =====================================================================
+   TOP BAR
+   ===================================================================== */
+.topbar{ position:sticky; top:0; z-index:40; background:color-mix(in srgb, var(--page) 92%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:16px 28px; }
+.topbar-row1{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.topbar-title h1{ font-size:19px; font-weight:750; letter-spacing:-0.01em; }
+.topbar-title .sub{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+.date-badge{ background:var(--surface-2); border:1px solid var(--border-strong); border-radius:999px; padding:7px 14px; font-size:12px; font-weight:650; color:var(--text-secondary); }
+.topbar-row2{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.filter-field{ display:flex; flex-direction:column; gap:3px; }
+.filter-field label{ font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); }
+.filter-field select{
+  appearance:none; -webkit-appearance:none; background:var(--surface-1) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="%238a8f99" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>') no-repeat right 10px center;
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 28px 8px 11px; font-size:12.5px; color:var(--text-primary); min-width:126px; cursor:pointer;
+}
+.filter-field select:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+.btn{ appearance:none; border:1px solid var(--border-strong); border-radius:var(--radius-sm); cursor:pointer; font-weight:650; font-size:12.5px; padding:8px 15px; background:var(--surface-1); color:var(--text-primary); transition:background .15s, transform .15s, box-shadow .15s; }
+.btn:hover{ background:var(--surface-2); }
+.btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+.btn-primary:hover{ transform:translateY(-1px); box-shadow:var(--shadow-hover); }
+
+/* =====================================================================
+   MAIN CONTENT
+   ===================================================================== */
+main{ padding:22px 28px 60px; flex:1; }
+section{ margin-bottom:28px; }
+.section-title{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+.section-title h2{ font-size:15.5px; font-weight:700; }
+.section-title p{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+.card{ background:var(--surface-1); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px 18px 14px; box-shadow:var(--shadow-rest); transition:box-shadow .2s var(--ease); position:relative; }
+.card:hover{ box-shadow:var(--shadow-hover); }
+.card-title{ font-size:12.5px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px; }
+.card-sub{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+/* =====================================================================
+   KPI ROW
+   ===================================================================== */
+.kpi-row{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; }
+@media (max-width:1200px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:560px){ .kpi-row{ grid-template-columns:1fr; } }
+.kpi-card{ padding:14px 16px 12px; cursor:default; }
+.kpi-top{ display:flex; justify-content:space-between; align-items:flex-start; }
+.kpi-label{ font-size:11px; font-weight:650; color:var(--text-muted); }
+.info-dot{ width:14px; height:14px; border-radius:50%; border:1px solid var(--border-strong); color:var(--text-muted); font-size:9px; display:grid; place-items:center; flex:none; cursor:default; }
+.kpi-tip{ position:absolute; right:14px; top:34px; opacity:0; pointer-events:none; transform:translateY(4px); transition:opacity .15s, transform .15s; background:#1c1f26; color:#fff; font-size:11px; padding:8px 10px; border-radius:8px; max-width:200px; z-index:6; box-shadow:var(--shadow-hover); }
+.info-dot:hover + .kpi-tip{ opacity:1; transform:translateY(0); pointer-events:auto; }
+.kpi-value{ font-size:22px; font-weight:750; letter-spacing:-0.015em; margin-top:6px; font-variant-numeric:tabular-nums; }
+.kpi-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+.kpi-delta{ font-size:11.5px; font-weight:700; }
+.kpi-delta.up{ color:var(--status-good); } .kpi-delta.down{ color:var(--status-critical); } .kpi-delta.flat{ color:var(--text-muted); }
+.kpi-row .kpi-card:nth-child(1){ border-left:3px solid var(--series-1); }
+.kpi-row .kpi-card:nth-child(2){ border-left:3px solid var(--series-2); }
+.kpi-row .kpi-card:nth-child(3){ border-left:3px solid var(--series-3); }
+.kpi-row .kpi-card:nth-child(4){ border-left:3px solid var(--series-4); }
+.kpi-row .kpi-card:nth-child(5){ border-left:3px solid var(--series-5); }
+.kpi-row .kpi-card:nth-child(6){ border-left:3px solid var(--series-6); }
+.kpi-row .kpi-card:nth-child(7){ border-left:3px solid var(--series-7); }
+.kpi-row .kpi-card:nth-child(8){ border-left:3px solid var(--series-8); }
+
+/* =====================================================================
+   CHART BANDS
+   ===================================================================== */
+.band-grid-main{ display:grid; grid-template-columns:1.4fr 1.1fr 1fr; gap:14px; margin-bottom:14px; }
+@media (max-width:1200px){ .band-grid-main{ grid-template-columns:1fr; } }
+.band-grid-secondary{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:900px){ .band-grid-secondary{ grid-template-columns:1fr; } }
+.lower-band{ display:grid; grid-template-columns:1.5fr 1fr; gap:14px; }
+@media (max-width:1200px){ .lower-band{ grid-template-columns:1fr; } }
+.lower-band .span-2{ grid-column:1 / -1; }
+.chart-el{ width:100%; }
+.donut-legend{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.donut-legend-row{ display:flex; align-items:center; justify-content:space-between; font-size:12px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:background .15s; }
+.donut-legend-row:hover{ background:var(--surface-2); }
+.donut-legend-row .lg-left{ display:flex; align-items:center; gap:8px; color:var(--text-secondary); }
+.donut-legend-row .lg-dot{ width:9px; height:9px; border-radius:3px; flex:none; }
+.donut-legend-row .lg-val{ font-weight:700; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+.map-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px; color:var(--text-secondary); }
+.map-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.map-legend .dot{ width:8px; height:8px; border-radius:50%; }
+
+/* =====================================================================
+   TABLE
+   ===================================================================== */
+table.data-table{ width:100%; border-collapse:collapse; font-size:12px; }
+table.data-table th, table.data-table td{ text-align:right; padding:9px 10px; border-bottom:1px solid var(--grid-line); font-variant-numeric:tabular-nums; }
+table.data-table th:first-child, table.data-table td:first-child{ text-align:left; font-variant-numeric:normal; }
+table.data-table th{ color:var(--text-muted); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; }
+table.data-table tbody tr{ transition:background .15s; cursor:pointer; }
+table.data-table tbody tr:hover{ background:var(--surface-2); }
+table.data-table tbody tr.highlight{ background:color-mix(in srgb, var(--accent) 10%, transparent); }
+.badge{ display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; }
+.badge.good{ background:color-mix(in srgb, var(--status-good) 15%, transparent); color:var(--status-good); }
+.badge.warning{ background:color-mix(in srgb, var(--status-warning) 20%, transparent); color:#8a5a00; }
+.badge.critical{ background:color-mix(in srgb, var(--status-critical) 14%, transparent); color:var(--status-critical); }
+
+/* =====================================================================
+   RISK MATRIX
+   ===================================================================== */
+.risk-matrix{ display:grid; grid-template-columns:auto repeat(4,1fr); gap:4px; margin-top:12px; }
+.risk-matrix .axis-label{ font-size:9.5px; color:var(--text-muted); font-weight:700; display:flex; align-items:center; justify-content:center; text-align:center; }
+.risk-cell{ border-radius:8px; padding:10px 6px; text-align:center; color:#fff; font-weight:750; font-size:15px; cursor:default; transition:transform .15s; }
+.risk-cell:hover{ transform:scale(1.05); }
+.risk-cell .cnt-label{ font-size:9px; font-weight:650; opacity:.85; display:block; margin-top:2px; }
+.risk-axis-y{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:9.5px; color:var(--text-muted); font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+/* =====================================================================
+   ALERTS LIST
+   ===================================================================== */
+.alert-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.alert-item{ display:flex; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2); }
+.alert-item .sev-bar{ width:4px; border-radius:4px; flex:none; }
+.alert-item.critical .sev-bar{ background:var(--status-critical); }
+.alert-item.warning .sev-bar{ background:var(--status-warning); }
+.alert-item .a-title{ font-size:12px; font-weight:700; }
+.alert-item .a-desc{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+/* =====================================================================
+   SIMULATOR
+   ===================================================================== */
+.sim-card{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:900px){ .sim-card{ grid-template-columns:1fr; } }
+.sim-control label{ display:flex; justify-content:space-between; font-size:12.5px; font-weight:700; margin-bottom:8px; }
+.sim-control label span{ color:var(--accent); font-variant-numeric:tabular-nums; }
+input[type="range"]{ -webkit-appearance:none; width:100%; height:4px; border-radius:999px; background:var(--grid-line); outline:none; }
+input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:3px solid var(--surface-1); box-shadow:0 1px 4px rgba(0,0,0,.25); cursor:pointer; margin-top:-7px; }
+input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:3px solid var(--surface-1); cursor:pointer; }
+.select-inline{ appearance:none; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 26px 8px 10px; font-size:12.5px; color:var(--text-primary); width:100%; margin-bottom:16px;
+  background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="%238a8f99" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>'); background-repeat:no-repeat; background-position:right 10px center; }
+.sim-compare{ display:flex; gap:20px; margin-top:10px; }
+.sim-compare .col{ flex:1; }
+.sim-compare .lab{ font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); font-weight:700; }
+.sim-compare .num{ font-size:20px; font-weight:750; margin-top:6px; }
+.sim-arrow{ align-self:center; color:var(--text-muted); }
+.sim-note{ font-size:11.5px; color:var(--text-muted); margin-top:14px; line-height:1.6; }
+
+/* =====================================================================
+   ROUTE DETAIL DRAWER
+   ===================================================================== */
+.drawer-overlay{ position:fixed; inset:0; background:rgba(20,20,20,.35); z-index:90; opacity:0; pointer-events:none; transition:opacity .25s var(--ease); }
+.drawer-overlay.open{ opacity:1; pointer-events:auto; }
+.drawer{ position:fixed; top:0; right:0; height:100vh; width:min(420px,94vw); background:var(--surface-1); border-left:1px solid var(--border); z-index:95; transform:translateX(100%); transition:transform .3s var(--ease); overflow-y:auto; box-shadow:-24px 0 60px rgba(0,0,0,.18); }
+.drawer.open{ transform:translateX(0); }
+.drawer-head{ display:flex; justify-content:space-between; align-items:flex-start; padding:20px 20px 14px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface-1); }
+.drawer-body{ padding:18px 20px 40px; display:flex; flex-direction:column; gap:18px; }
+.drawer-close{ background:var(--surface-2); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; cursor:pointer; display:grid; place-items:center; flex:none; }
+.drawer-kpis{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.drawer-kpis .box{ background:var(--surface-2); border-radius:var(--radius-sm); padding:12px 14px; }
+.drawer-kpis .box .num{ font-size:18px; font-weight:750; margin-top:4px; }
+
+/* =====================================================================
+   DATA DICTIONARY
+   ===================================================================== */
+.dict-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px 24px; }
+@media (max-width:800px){ .dict-grid{ grid-template-columns:1fr; } }
+.dict-row{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--grid-line); font-size:12px; gap:12px; }
+.dict-row .term{ font-weight:700; color:var(--text-primary); flex:none; }
+.dict-row .def{ color:var(--text-muted); text-align:right; }
+
+footer{ padding:20px 28px 40px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-muted); line-height:1.7; }
+
+/* =====================================================================
+   HUDDLE MODE
+   ===================================================================== */
+body.huddle-mode .topbar-row2, body.huddle-mode #inventory, body.huddle-mode #warehouses,
+body.huddle-mode #data-dictionary, body.huddle-mode .sidebar, body.huddle-mode footer,
+body.huddle-mode #carriers { display:none !important; }
+body.huddle-mode .kpi-value{ font-size:28px; }
+body.huddle-mode main{ padding:18px 24px 40px; }
+.huddle-exit{ position:fixed; bottom:20px; right:20px; z-index:80; display:none; }
+body.huddle-mode .huddle-exit{ display:inline-flex; }
+
+@media (max-width:860px){
+  .sidebar{ width:64px; }
+  .side-brand .name, .side-brand .sub, .side-link span.label{ display:none; }
+  .side-brand{ justify-content:center; padding:18px 0; }
+  .side-link{ justify-content:center; padding:12px 0; }
+  main{ padding:18px 14px 50px; }
+  .topbar{ padding:14px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- =====================================================================
+       LEFT SIDEBAR NAVIGATION
+       ===================================================================== -->
+  <nav class="sidebar" id="sidebar">
+    <div class="side-brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l2-6 4 12 2-6h6" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <div><div class="name">ShipControl</div><div class="sub">Supply Chain Control Tower</div></div>
+    </div>
+    <div class="side-nav" id="sideNav">
+      <a class="side-link active" data-scroll="kpi-executive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="4" height="9"/><rect x="10" y="6" width="4" height="14"/><rect x="17" y="3" width="4" height="17"/></svg><span class="label">Executive Summary</span></a>
+      <a class="side-link" data-scroll="fulfillment-analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/></svg><span class="label">Fulfillment Analytics</span></a>
+      <a class="side-link" data-scroll="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 7l9-4 9 4"/></svg><span class="label">Inventory</span></a>
+      <a class="side-link" data-scroll="delays-risk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l8 15H4z"/><path d="M12 10v4M12 16.5h.01"/></svg><span class="label">Delays &amp; Risk</span></a>
+      <a class="side-link" data-scroll="carriers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="9" width="14" height="8" rx="1"/><path d="M15 12h4l3 3v2h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="18" cy="19" r="1.6"/></svg><span class="label">Carriers</span></a>
+      <a class="side-link" data-scroll="warehouses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6v10H3z"/><path d="M9 20v-6h6v6"/></svg><span class="label">Warehouses</span></a>
+      <a class="side-link" data-scroll="alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.6 18a1.7 1.7 0 001.5 2.5h15.8a1.7 1.7 0 001.5-2.5L13.7 3.9a1.7 1.7 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span class="label">Alerts</span></a>
+      <a class="side-link" data-scroll="data-dictionary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1"/></svg><span class="label">Data Dictionary</span></a>
+    </div>
+    <div class="side-foot">Portfolio case study &middot; synthetic data &middot; no backend</div>
+  </nav>
+
+  <div class="main-col">
+
+    <!-- ===================================================================
+         TOP BAR
+         =================================================================== -->
+    <header class="topbar">
+      <div class="topbar-row1">
+        <div class="topbar-title">
+          <h1>Supply Chain Control Tower</h1>
+          <div class="sub">Fulfillment health, delay risk and inventory exposure</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="date-badge" id="dateBadge">Week of 01 Apr 2024</span>
+          <button class="btn" id="viewAlertsBtn">View alerts</button>
+          <button class="btn" id="huddleToggle">Huddle mode</button>
+        </div>
+      </div>
+      <div class="topbar-row2">
+        <div class="filter-field"><label for="fWeek">Week range</label>
+          <select id="fWeek">
+            <option value="4">Last 4 weeks</option>
+            <option value="8" selected>Last 8 weeks</option>
+            <option value="12">Last 12 weeks</option>
+            <option value="16">Last 16 weeks</option>
+          </select>
+        </div>
+        <div class="filter-field"><label for="fOrigin">Origin region</label><select id="fOrigin"><option value="all">All</option></select></div>
+        <div class="filter-field"><label for="fDest">Destination region</label><select id="fDest"><option value="all">All</option></select></div>
+        <div class="filter-field"><label for="fCarrier">Carrier</label><select id="fCarrier"><option value="all">All</option></select></div>
+        <div class="filter-field"><label for="fPriority">Priority</label>
+          <select id="fPriority"><option value="all">All</option><option value="standard">Standard</option><option value="express">Express</option></select>
+        </div>
+        <div class="filter-field"><label for="fShipType">Shipment type</label><select id="fShipType"><option value="all">All</option></select></div>
+        <button class="btn" id="resetFilters" style="margin-top:16px;">Reset</button>
+      </div>
+    </header>
+
+    <main>
+
+      <!-- =================================================================
+           KPI ROW
+           ================================================================= -->
+      <section class="kpi-row" id="kpi-executive"></section>
+
+      <!-- =================================================================
+           MIDDLE CHART BAND
+           ================================================================= -->
+      <section id="fulfillment-analytics">
+        <div class="section-title"><div><h2>Fulfillment Analytics</h2><p>Shipment volume, on-time performance and network lanes.</p></div></div>
+        <div class="band-grid-main">
+          <div class="card">
+            <div class="card-title">Shipment Volume &amp; OTIF Trend</div>
+            <div class="card-sub">Bars = shipments (left axis) &middot; Line = OTIF % (right axis)</div>
+            <div id="trendChart" class="chart-el" style="height:280px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Shipment Lanes</div>
+            <div class="card-sub">Hubs colored by OTIF status &middot; click a lane to open route detail</div>
+            <div id="geoChart" class="chart-el" style="height:280px;"></div>
+            <div class="map-legend">
+              <span><span class="dot" style="background:var(--status-good)"></span>On-time &ge; 95%</span>
+              <span><span class="dot" style="background:var(--status-warning)"></span>Watch 88&ndash;95%</span>
+              <span><span class="dot" style="background:var(--status-critical)"></span>At risk &lt; 88%</span>
+            </div>
+          </div>
+          <div class="card" id="delays-risk">
+            <div class="card-title">Delay Reasons Distribution</div>
+            <div class="card-sub">Click a slice to filter the routes table</div>
+            <div id="reasonDonut" class="chart-el" style="height:190px;"></div>
+            <div class="donut-legend" id="reasonLegend"></div>
+          </div>
+        </div>
+        <div class="band-grid-secondary">
+          <div class="card">
+            <div class="card-title">Shipments by Day of Week</div>
+            <div id="dowChart" class="chart-el" style="height:180px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Shipments by Hour</div>
+            <div id="hourChart" class="chart-el" style="height:180px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================
+           LOWER BAND
+           ================================================================= -->
+      <section>
+        <div class="section-title"><div><h2>Risk, Routes &amp; Warehouse Health</h2><p>Where inventory and delivery risk concentrate.</p></div></div>
+        <div class="lower-band">
+          <div class="card" id="inventory">
+            <div class="card-title">Inventory Risk Matrix</div>
+            <div class="card-sub">Likelihood (rows) &times; Impact (columns) &middot; cell = SKU clusters</div>
+            <div class="risk-matrix" id="riskMatrix"></div>
+          </div>
+          <div class="card" id="warehouses">
+            <div class="card-title">Warehouse Health Trend</div>
+            <div class="card-sub">Congestion score, weekly</div>
+            <div id="warehouseTrendChart" class="chart-el" style="height:220px;"></div>
+          </div>
+          <div class="card span-2">
+            <div class="card-title">Top Routes by Risk</div>
+            <div class="card-sub">Click a row to open route detail and highlight it on the map</div>
+            <div style="overflow-x:auto; margin-top:8px;">
+              <table class="data-table" id="routesTable">
+                <thead><tr><th>Route</th><th>Shipments</th><th>OTIF %</th><th>Avg Delay</th><th>Main Reason</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card span-2" id="alerts">
+            <div class="card-title">Recent Critical Alerts</div>
+            <div class="card-sub">Auto-generated from the current filter slice</div>
+            <div class="alert-list" id="alertList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================
+           CARRIER SCENARIO SIMULATOR
+           ================================================================= -->
+      <section id="carriers">
+        <div class="section-title"><div><h2>Carrier Scenario Simulator</h2><p>Reroute volume away from an underperforming carrier and project the OTIF impact.</p></div></div>
+        <div class="card sim-card">
+          <div>
+            <label class="kicker" for="simCarrier" style="display:block; margin-bottom:6px;">Reroute volume away from</label>
+            <select id="simCarrier" class="select-inline"></select>
+            <div class="sim-control">
+              <label>Reroute share <span id="rerouteVal">0%</span></label>
+              <input type="range" id="rerouteSlider" min="0" max="60" step="5" value="0">
+            </div>
+            <div class="sim-note">Baseline uses the currently filtered week range, regions, carrier, priority and shipment type.</div>
+            <button class="btn" id="simReset" style="margin-top:12px;">Reset slider</button>
+          </div>
+          <div>
+            <div class="sim-compare">
+              <div class="col"><div class="lab">Baseline OTIF</div><div class="num" id="simBaseline">&mdash;</div></div>
+              <div class="sim-arrow">&rarr;</div>
+              <div class="col"><div class="lab">Projected OTIF</div><div class="num" id="simProjected">&mdash;</div></div>
+            </div>
+            <div id="simChart" style="height:170px; margin-top:12px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================
+           DATA DICTIONARY
+           ================================================================= -->
+      <section class="data-dictionary" id="data-dictionary">
+        <div class="section-title"><div><h2>Data Dictionary</h2><p>Plain-English definitions for every metric on this dashboard.</p></div></div>
+        <div class="card"><div class="dict-grid" id="dictGrid"></div></div>
+      </section>
+
+    </main>
+
+    <footer>
+      Supply Chain Control Tower is a portfolio case study: a fully interactive, front-end-only operations dashboard built with semantic HTML, hand-written CSS and vanilla JavaScript, charted with Plotly.js (including its built-in world map). All data is synthetic and generated in-browser &mdash; nothing is transmitted anywhere.
+    </footer>
+  </div>
+</div>
+
+<button class="btn btn-primary huddle-exit" id="huddleExit">Exit huddle mode</button>
+
+<!-- =====================================================================
+     ROUTE DETAIL DRAWER
+     ===================================================================== -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div><span class="kicker">Route detail</span><h3 id="drawerTitle" style="font-size:18px; margin-top:4px;">&mdash;</h3></div>
+    <button class="drawer-close" id="drawerClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-kpis" id="drawerKpis"></div>
+    <div><div class="card-title" style="margin-bottom:8px;">Delay reason breakdown</div><div id="drawerBar" style="height:170px;"></div></div>
+    <div><div class="card-title" style="margin-bottom:8px;">Weekly OTIF trend</div><div id="drawerTrend" style="height:150px;"></div></div>
+  </div>
+</aside>
+
+<script>
+/* =====================================================================
+   SECTION: SYNTHETIC DATA GENERATION (deterministic / seeded)
+   ===================================================================== */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(20260724);
+
+const WAREHOUSES = [
+  {id:'us-east',  name:'Newark (US-East)',      lat:40.7,  lon:-74.2,  region:'na-east', congestion:1.10},
+  {id:'us-west',  name:'Los Angeles (US-West)',  lat:33.9,  lon:-118.4, region:'na-west', congestion:1.25},
+  {id:'eu-west',  name:'Rotterdam (EU-West)',    lat:51.9,  lon:4.5,    region:'europe',  congestion:1.00},
+  {id:'apac-sg',  name:'Singapore (APAC)',       lat:1.35,  lon:103.8,  region:'apac',    congestion:1.15},
+  {id:'latam-br', name:'São Paulo (LATAM)', lat:-23.5, lon:-46.6,  region:'latam',   congestion:0.90},
+];
+const REGIONS = [
+  {id:'na-east', name:'North America East', lat:39,  lon:-80},
+  {id:'na-west', name:'North America West', lat:36,  lon:-119},
+  {id:'europe',  name:'Europe',             lat:49,  lon:12},
+  {id:'apac',    name:'APAC',               lat:8,   lon:112},
+  {id:'latam',   name:'LATAM',              lat:-16, lon:-52},
+];
+const CARRIERS = [
+  {id:'freightline',    name:'FreightLine Global',    baseReliability:0.93},
+  {id:'quickhaul',      name:'QuickHaul Express',     baseReliability:0.88},
+  {id:'oceanbridge',    name:'OceanBridge Logistics', baseReliability:0.85},
+  {id:'regionaldirect', name:'RegionalDirect',        baseReliability:0.90},
+];
+const PRIORITIES = [
+  {id:'standard', name:'Standard', slaAdj:0},
+  {id:'express',  name:'Express',  slaAdj:0.045},
+];
+const SHIPMENT_TYPES = [
+  {id:'parcel',    name:'Parcel',    valueMult:0.6, transitMult:0.85},
+  {id:'pallet',    name:'Pallet',    valueMult:1.3, transitMult:1.0},
+  {id:'container', name:'Container', valueMult:2.4, transitMult:1.3},
+];
+const DELAY_REASONS = [
+  {id:'weather',    name:'Weather'},
+  {id:'port',       name:'Port Congestion'},
+  {id:'customs',    name:'Customs Hold'},
+  {id:'capacity',   name:'Capacity Constraint'},
+  {id:'carrier',    name:'Carrier Delay'},
+  {id:'docs',       name:'Documentation Error'},
+];
+const LANES = [
+  {id:'LN-01', origin:'us-east',  destRegion:'na-east', transitDays:3},
+  {id:'LN-02', origin:'us-east',  destRegion:'europe',  transitDays:8},
+  {id:'LN-03', origin:'us-east',  destRegion:'latam',   transitDays:7},
+  {id:'LN-04', origin:'us-west',  destRegion:'na-west', transitDays:3},
+  {id:'LN-05', origin:'us-west',  destRegion:'apac',    transitDays:9},
+  {id:'LN-06', origin:'eu-west',  destRegion:'europe',  transitDays:3},
+  {id:'LN-07', origin:'eu-west',  destRegion:'na-east', transitDays:7},
+  {id:'LN-08', origin:'eu-west',  destRegion:'apac',    transitDays:10},
+  {id:'LN-09', origin:'apac-sg',  destRegion:'apac',    transitDays:3},
+  {id:'LN-10', origin:'apac-sg',  destRegion:'latam',   transitDays:11},
+  {id:'LN-11', origin:'latam-br', destRegion:'latam',   transitDays:3},
+  {id:'LN-12', origin:'latam-br', destRegion:'na-west', transitDays:8},
+];
+function laneWeight(wh, laneList){
+  return laneList.map(l => l.destRegion === wh.region ? 0.42 : 0.58/(laneList.length-1));
+}
+
+const TODAY = new Date(2026,6,24);
+const WEEKS = Array.from({length:16}, (_,i)=>{
+  const d = new Date(TODAY); d.setDate(d.getDate() - (15-i)*7);
+  return { index:i, label:'Wk '+d.toLocaleDateString('en-US',{month:'short', day:'numeric'}), date:d };
+});
+
+const RECORDS = [];
+WAREHOUSES.forEach(wh=>{
+  const laneChoices = LANES.filter(l=>l.origin===wh.id);
+  const weights = laneWeight(wh, laneChoices);
+  WEEKS.forEach(week=>{
+    CARRIERS.forEach(carrier=>{
+      PRIORITIES.forEach(pri=>{
+        SHIPMENT_TYPES.forEach(stype=>{
+          let roll = rng(), acc = 0, lane = laneChoices[0];
+          for(let i=0;i<laneChoices.length;i++){ acc += weights[i]; if(roll<=acc){ lane = laneChoices[i]; break; } }
+          const priVolMult = pri.id==='express' ? 0.5 : 1;
+          const shipments = Math.max(3, Math.round((45 + rng()*60) * priVolMult));
+          let otifRate = carrier.baseReliability - (wh.congestion-1)*0.22 - pri.slaAdj + (rng()-0.5)*0.10;
+          otifRate = Math.min(0.99, Math.max(0.5, otifRate));
+          const otifShipments = Math.round(shipments*otifRate);
+          const delayed = shipments - otifShipments;
+          const reasonWeights = DELAY_REASONS.map(r=>{
+            if(r.id==='capacity') return wh.congestion;
+            if(r.id==='carrier') return (1-carrier.baseReliability)*4;
+            if(r.id==='customs') return (lane.destRegion==='europe'||lane.destRegion==='apac') ? 1.1 : 0.5;
+            if(r.id==='weather') return lane.destRegion==='latam' ? 1.1 : 0.6;
+            if(r.id==='port') return stype.id==='container' ? 1.3 : 0.6;
+            return 0.6;
+          });
+          const totalW = reasonWeights.reduce((a,b)=>a+b,0);
+          let rroll = rng()*totalW, racc=0, reasonId = DELAY_REASONS[0].id;
+          for(let i=0;i<DELAY_REASONS.length;i++){ racc+=reasonWeights[i]; if(rroll<=racc){ reasonId = DELAY_REASONS[i].id; break; } }
+          const avgTransitDays = lane.transitDays * stype.transitMult * (0.92 + rng()*0.26) + (1-otifRate)*3;
+          const inventoryValue = shipments * stype.valueMult * (180 + rng()*220);
+          RECORDS.push({
+            w: week.index, warehouseId: wh.id, originRegionId: wh.region, carrierId: carrier.id, priorityId: pri.id, shipTypeId: stype.id,
+            regionId: lane.destRegion, laneId: lane.id,
+            shipments, otifShipments, delayed, reasonId, avgTransitDays, inventoryValue,
+          });
+        });
+      });
+    });
+  });
+});
+
+const DOW_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DOW_SHAPE = [0.158,0.160,0.152,0.150,0.148,0.118,0.114];
+const HOUR_SHAPE = Array.from({length:24}, (_,h)=>{
+  const morning = Math.exp(-((h-9)**2)/16);
+  const midday = Math.exp(-((h-14)**2)/20);
+  return 0.55*morning + 0.45*midday + 0.02;
+});
+const HOUR_SUM = HOUR_SHAPE.reduce((a,b)=>a+b,0);
+
+const RISK_CATEGORIES = ['Apparel','Electronics','Home Goods','Beauty','Footwear','Accessories'];
+const RISK_POINTS = [];
+WAREHOUSES.forEach(wh=>{
+  RISK_CATEGORIES.forEach(cat=>{
+    if(rng() > 0.6) return;
+    const daysOfSupply = Math.round(rng()*58 + 2);
+    const valueAtRisk = Math.round(rng()*95000 + 4000);
+    RISK_POINTS.push({ warehouseId:wh.id, category:cat, daysOfSupply, valueAtRisk });
+  });
+});
+
+/* =====================================================================
+   SECTION: FORMATTERS
+   ===================================================================== */
+const fmtUSD = n => n>=1e6 ? '$'+(n/1e6).toFixed(2)+'M' : n>=1e3 ? '$'+(n/1e3).toFixed(1)+'K' : '$'+Math.round(n);
+const fmtUSDFull = n => '$'+Math.round(n).toLocaleString('en-US');
+const fmtPct = n => n.toFixed(1)+'%';
+const fmtSigned = (n, unit) => (n>=0?'+':'') + n.toFixed(1) + (unit||'');
+const fmtInt = n => Math.round(n).toLocaleString('en-US');
+
+/* =====================================================================
+   SECTION: THEME HELPERS FOR PLOTLY
+   ===================================================================== */
+function themeColors(){
+  const cs = getComputedStyle(document.body);
+  const v = name => cs.getPropertyValue(name).trim();
+  return {
+    surface: v('--surface-1'), text: v('--text-primary'), textSecondary: v('--text-secondary'),
+    muted: v('--text-muted'), grid: v('--grid-line'), baseline: v('--baseline'), surface2:v('--surface-2'),
+    s1:v('--series-1'), s2:v('--series-2'), s3:v('--series-3'), s4:v('--series-4'),
+    s5:v('--series-5'), s6:v('--series-6'), s7:v('--series-7'), s8:v('--series-8'),
+    good:v('--status-good'), warn:v('--status-warning'), serious:v('--status-serious'), crit:v('--status-critical'),
+  };
+}
+function baseLayout(extra){
+  const t = themeColors();
+  return Object.assign({
+    paper_bgcolor: t.surface, plot_bgcolor: t.surface,
+    font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: t.textSecondary, size:11.5 },
+    margin: { t:10, r:14, b:32, l:44 },
+    hoverlabel: { bgcolor: '#1c1f26', font:{ color:'#fff', size:11.5 }, bordercolor: '#1c1f26' },
+    showlegend:false,
+  }, extra||{});
+}
+const plotlyConfig = { displayModeBar:false, responsive:true };
+
+/* =====================================================================
+   SECTION: STATE, FILTER PLUMBING, AGGREGATION
+   ===================================================================== */
+const state = { weekKey:'8', origin:'all', dest:'all', carrier:'all', priority:'all', shipType:'all', reroute:0 };
+
+function populateSelect(id, items){
+  const sel = document.getElementById(id);
+  items.forEach(it=>{ const o=document.createElement('option'); o.value=it.id; o.textContent=it.name; sel.appendChild(o); });
+}
+populateSelect('fOrigin', REGIONS);
+populateSelect('fDest', REGIONS);
+populateSelect('fCarrier', CARRIERS);
+populateSelect('fShipType', SHIPMENT_TYPES);
+populateSelect('simCarrier', CARRIERS);
+
+function resolveWeekRange(key){ const n = parseInt(key,10); return [Math.max(0,15-n+1), 15]; }
+function updateDateBadge(){
+  const [,end] = resolveWeekRange(state.weekKey);
+  document.getElementById('dateBadge').textContent = 'Week of ' + WEEKS[end].date.toLocaleDateString('en-GB',{day:'2-digit', month:'short', year:'numeric'});
+}
+function filterRecords({start,end,origin,dest,carrier,priority,shipType}){
+  return RECORDS.filter(r =>
+    r.w>=start && r.w<=end &&
+    (origin==='all'||r.originRegionId===origin) &&
+    (dest==='all'||r.regionId===dest) &&
+    (carrier==='all'||r.carrierId===carrier) &&
+    (priority==='all'||r.priorityId===priority) &&
+    (shipType==='all'||r.shipTypeId===shipType)
+  );
+}
+function aggregate(records){
+  const a = { shipments:0, otifShipments:0, delayed:0, transitWeighted:0, inventoryValue:0 };
+  records.forEach(r=>{ a.shipments+=r.shipments; a.otifShipments+=r.otifShipments; a.delayed+=r.delayed; a.transitWeighted += r.avgTransitDays*r.shipments; a.inventoryValue += r.inventoryValue; });
+  a.otifPct = a.shipments ? (a.otifShipments/a.shipments)*100 : 0;
+  a.onTimePct = Math.min(99.5, a.otifPct + 4.2);
+  a.avgTransit = a.shipments ? a.transitWeighted/a.shipments : 0;
+  a.atRisk = Math.round(a.delayed * 0.55);
+  a.backorderPct = a.shipments ? (a.delayed*0.32/a.shipments)*100 : 0;
+  return a;
+}
+function currentFilterSet(){ const [start,end] = resolveWeekRange(state.weekKey); return { start, end, origin:state.origin, dest:state.dest, carrier:state.carrier, priority:state.priority, shipType:state.shipType }; }
+function previousFilterSet(){
+  const [start,end] = resolveWeekRange(state.weekKey);
+  const len = end-start+1; const pStart = Math.max(0,start-len), pEnd = start-1;
+  if(pEnd<pStart) return null;
+  return { start:pStart, end:pEnd, origin:state.origin, dest:state.dest, carrier:state.carrier, priority:state.priority, shipType:state.shipType };
+}
+function warehouseCongestionScore(records){
+  if(!records.length) return 0;
+  const byWh = {};
+  records.forEach(r=>{ (byWh[r.warehouseId] ||= {ship:0,delay:0}); byWh[r.warehouseId].ship+=r.shipments; byWh[r.warehouseId].delay+=r.delayed; });
+  let total=0, weight=0;
+  Object.keys(byWh).forEach(id=>{
+    const wh = WAREHOUSES.find(w=>w.id===id); const b = byWh[id];
+    const delayRate = b.ship ? b.delay/b.ship : 0;
+    const score = Math.min(100, (delayRate*140 + (wh.congestion-1)*90));
+    total += score*b.ship; weight += b.ship;
+  });
+  return weight ? total/weight : 0;
+}
+
+/* =====================================================================
+   SECTION: RENDER -- KPI ROW
+   ===================================================================== */
+function svgSparkline(values, color, mutedColor){
+  const w=100,h=30,pad=3;
+  const min = Math.min(...values), max = Math.max(...values);
+  const scaleY = v => h-pad - ((v-min)/((max-min)||1))*(h-pad*2);
+  const step = (w-pad*2)/(Math.max(1,values.length-1));
+  const pts = values.map((v,i)=>[pad+i*step, scaleY(v)]);
+  const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length-1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${path}" fill="none" stroke="${mutedColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="${color}"/></svg>`;
+}
+const KPI_TIPS = {
+  'OTIF %':'Share of shipments delivered on time and in full.',
+  'On-Time Delivery %':'Share of shipments delivered by the promised date, regardless of fill rate.',
+  'Delayed Shipments':'Count of shipments currently missing their delivery promise.',
+  'At-Risk Orders':'Delayed shipments likely to miss SLA if unresolved.',
+  'Avg Transit Time':'Weighted average transit days across the filtered network.',
+  'Inventory Exposure':'Dollar value of inventory currently in transit or held.',
+  'Backorder Rate':'Share of shipments delayed specifically due to inventory shortage.',
+  'Warehouse Congestion':'Composite 0–100 score blending delay rate and structural warehouse load.',
+};
+function renderKPIs(){
+  const t = themeColors();
+  const cur = aggregate(filterRecords(currentFilterSet()));
+  const prevSet = previousFilterSet();
+  const prev = prevSet ? aggregate(filterRecords(prevSet)) : null;
+  const curRecords = filterRecords(currentFilterSet());
+  const congestion = warehouseCongestionScore(curRecords);
+  const [start,end] = resolveWeekRange(state.weekKey);
+  const win = []; for(let i=Math.max(0,end-5);i<=end;i++) win.push(i);
+  const baseSet = { origin:state.origin, dest:state.dest, carrier:state.carrier, priority:state.priority, shipType:state.shipType };
+  const seriesFor = metricFn => win.map(wi=> metricFn(aggregate(filterRecords(Object.assign({}, baseSet, {start:wi,end:wi})))));
+
+  const dir = (c,p,goodUp=true) => { const d=c-p; if(Math.abs(d)<1e-9) return 'flat'; return (d>0)===goodUp ? 'up':'down'; };
+  const pctDelta = (c,p) => p ? ((c-p)/Math.abs(p))*100 : 0;
+
+  const cards = [
+    { label:'OTIF %', value:fmtPct(cur.otifPct), metric:a=>a.otifPct, goodUp:true },
+    { label:'On-Time Delivery %', value:fmtPct(cur.onTimePct), metric:a=>a.onTimePct, goodUp:true },
+    { label:'Delayed Shipments', value:fmtInt(cur.delayed), metric:a=>a.delayed, goodUp:false },
+    { label:'At-Risk Orders', value:fmtInt(cur.atRisk), metric:a=>a.atRisk, goodUp:false },
+    { label:'Avg Transit Time', value:cur.avgTransit.toFixed(1)+' d', metric:a=>a.avgTransit, goodUp:false },
+    { label:'Inventory Exposure', value:fmtUSD(cur.inventoryValue), metric:a=>a.inventoryValue, goodUp:false },
+    { label:'Backorder Rate', value:fmtPct(cur.backorderPct), metric:a=>a.backorderPct, goodUp:false },
+    { label:'Warehouse Congestion', value:congestion.toFixed(0)+'/100', static:true },
+  ];
+  const colors = [t.s1,t.s2,t.s3,t.s4,t.s5,t.s6,t.s7,t.s8];
+  const html = cards.map((c,i)=>{
+    if(c.static){
+      return `<div class="card kpi-card"><div class="kpi-top"><div class="kpi-label">${c.label}</div><span class="info-dot" tabindex="0">?</span></div><div class="kpi-tip">${KPI_TIPS[c.label]}</div><div class="kpi-value">${c.value}</div><div class="kpi-foot"><span class="kpi-delta flat">${congestion>60?'Elevated congestion':'Within normal range'}</span></div></div>`;
+    }
+    const series = seriesFor(c.metric);
+    const spark = svgSparkline(series, colors[i], t.grid);
+    const curV = c.metric(cur), prevV = prev ? c.metric(prev) : null;
+    const d = prev ? pctDelta(curV,prevV) : null;
+    const deltaLabel = prev ? `${fmtSigned(d,'%')} vs prior period` : 'No prior period';
+    return `<div class="card kpi-card"><div class="kpi-top"><div class="kpi-label">${c.label}</div><span class="info-dot" tabindex="0">?</span></div><div class="kpi-tip">${KPI_TIPS[c.label]}</div><div class="kpi-value">${c.value}</div><div class="kpi-foot"><span class="kpi-delta ${prev?dir(curV,prevV,c.goodUp):'flat'}">${deltaLabel}</span><span>${spark}</span></div></div>`;
+  }).join('');
+  document.getElementById('kpi-executive').innerHTML = html;
+}
+
+/* =====================================================================
+   SECTION: RENDER -- SHIPMENT VOLUME & OTIF TREND (combo, dual axis)
+   ===================================================================== */
+function renderTrend(){
+  const t = themeColors();
+  const [start,end] = resolveWeekRange(state.weekKey);
+  const weeks = []; for(let i=start;i<=end;i++) weeks.push(i);
+  const baseSet = { origin:state.origin, dest:state.dest, carrier:state.carrier, priority:state.priority, shipType:state.shipType };
+  const volSeries = weeks.map(wi=> aggregate(filterRecords(Object.assign({}, baseSet, {start:wi,end:wi}))).shipments);
+  const otifSeries = weeks.map(wi=> aggregate(filterRecords(Object.assign({}, baseSet, {start:wi,end:wi}))).otifPct);
+  const labels = weeks.map(wi=>WEEKS[wi].label);
+  const traces = [
+    { type:'bar', name:'Shipments', x:labels, y:volSeries, marker:{color:t.s1+'99'}, yaxis:'y', hovertemplate:'%{x}<br>Shipments: %{y:,.0f}<extra></extra>' },
+    { type:'scatter', mode:'lines', name:'OTIF %', x:labels, y:otifSeries, line:{color:t.s5, width:2.5, shape:'spline'}, yaxis:'y2', hovertemplate:'%{x}<br>OTIF: %{y:.1f}%<extra></extra>' },
+  ];
+  const layout = baseLayout({
+    xaxis:{ gridcolor:'transparent' },
+    yaxis:{ title:{text:'Shipments', font:{size:10,color:t.s1}}, gridcolor:t.grid, zerolinecolor:t.baseline },
+    yaxis2:{ title:{text:'OTIF %', font:{size:10,color:t.s5}}, overlaying:'y', side:'right', ticksuffix:'%', gridcolor:'transparent', range:[60,100] },
+    showlegend:true, legend:{ orientation:'h', y:1.16, x:0, font:{size:10.5,color:t.textSecondary} },
+    margin:{ t:24, r:44, b:32, l:48 },
+  });
+  Plotly.react('trendChart', traces, layout, plotlyConfig);
+}
+
+/* =====================================================================
+   SECTION: RENDER -- SHIPMENT LANES MAP
+   ===================================================================== */
+function laneStatus(otif){ return otif>=95 ? 'good' : otif>=88 ? 'warning' : 'critical'; }
+function laneAggregate(){
+  const cur = currentFilterSet();
+  return LANES.map(lane=>{
+    const recs = filterRecords(cur).filter(r=>r.laneId===lane.id);
+    const a = aggregate(recs);
+    const wh = WAREHOUSES.find(w=>w.id===lane.origin);
+    const region = REGIONS.find(r=>r.id===lane.destRegion);
+    return Object.assign({}, lane, { otifPct:a.otifPct, shipments:a.shipments, delayed:a.delayed, avgTransit:a.avgTransit, status: recs.length? laneStatus(a.otifPct):'none', wh, region });
+  }).filter(l=>l.shipments>0);
+}
+let highlightedLaneId = null;
+function renderMap(){
+  const t = themeColors();
+  const lanes = laneAggregate();
+  const statusColor = s => s==='good'?t.good:s==='warning'?t.warn:t.crit;
+  const traces = lanes.map(l=>({
+    type:'scattergeo', mode:'lines', lat:[l.wh.lat, l.region.lat], lon:[l.wh.lon, l.region.lon],
+    line:{ width: l.id===highlightedLaneId?4:2, color:statusColor(l.status) }, opacity: l.id===highlightedLaneId?1:0.75, hoverinfo:'skip', showlegend:false,
+  }));
+  const laneMarkers = {
+    type:'scattergeo', mode:'markers', lat:lanes.map(l=>(l.wh.lat+l.region.lat)/2), lon:lanes.map(l=>(l.wh.lon+l.region.lon)/2),
+    marker:{ size:lanes.map(l=> l.id===highlightedLaneId?13:9), color:lanes.map(l=>statusColor(l.status)), line:{ color:t.surface, width:2 } },
+    customdata:lanes.map(l=>[l.wh.name, l.region.name, fmtPct(l.otifPct), fmtInt(l.shipments), l.id]),
+    hovertemplate:'<b>%{customdata[4]}</b><br>%{customdata[0]} → %{customdata[1]}<br>OTIF: %{customdata[2]}<br>Shipments: %{customdata[3]}<extra></extra>',
+  };
+  const hubMarkers = {
+    type:'scattergeo', mode:'markers', lat:WAREHOUSES.map(w=>w.lat), lon:WAREHOUSES.map(w=>w.lon),
+    marker:{ size:12, color:t.s4, symbol:'square', line:{color:t.surface,width:2} }, hovertext:WAREHOUSES.map(w=>w.name), hoverinfo:'text',
+  };
+  const layout = baseLayout({
+    geo:{ projection:{type:'natural earth'}, showland:true, landcolor:t.surface2, showocean:true, oceancolor:t.surface, showcountries:true, countrycolor:t.grid, showcoastlines:false, showframe:false, bgcolor:t.surface, lataxis:{range:[-40,65]}, lonaxis:{range:[-150,155]} },
+    margin:{ t:4, r:4, b:4, l:4 },
+  });
+  Plotly.react('geoChart', [...traces, laneMarkers, hubMarkers], layout, plotlyConfig);
+  const el = document.getElementById('geoChart');
+  el.removeAllListeners('plotly_click');
+  el.on('plotly_click', ev=>{
+    const p = ev.points.find(pt=>pt.customdata);
+    if(p){ const lane = lanes.find(l=>l.id===p.customdata[4]); if(lane) openDrawer(lane); }
+  });
+}
+
+/* =====================================================================
+   SECTION: RENDER -- DELAY REASONS DONUT (click cross-filters routes table)
+   ===================================================================== */
+let selectedReason = null;
+function renderReasonDonut(){
+  const t = themeColors();
+  const recs = filterRecords(currentFilterSet());
+  const colors = [t.s1,t.s2,t.s3,t.s4,t.s5,t.s6,t.s7,t.s8];
+  const rows = DELAY_REASONS.map(r=>{
+    const count = recs.filter(rec=>rec.reasonId===r.id).reduce((s,rec)=>s+rec.delayed,0);
+    return { name:r.name, id:r.id, count };
+  }).filter(r=>r.count>0);
+  const total = rows.reduce((s,r)=>s+r.count,0) || 1;
+  Plotly.react('reasonDonut', [{
+    type:'pie', labels:rows.map(r=>r.name), values:rows.map(r=>r.count), hole:0.62,
+    marker:{ colors: rows.map((r,i)=> selectedReason && selectedReason!==r.id ? t.grid : colors[i]), line:{color:t.surface,width:2} },
+    textinfo:'none', hovertemplate:'<b>%{label}</b><br>%{value} delayed (%{percent})<extra></extra>',
+  }], baseLayout({ margin:{t:4,r:4,b:4,l:4} }), plotlyConfig);
+  const el = document.getElementById('reasonDonut');
+  el.removeAllListeners('plotly_click');
+  el.on('plotly_click', ev=>{
+    const r = rows[ev.points[0].pointNumber];
+    selectedReason = selectedReason===r.id ? null : r.id;
+    renderReasonDonut(); renderRoutesTable();
+  });
+  const legend = document.getElementById('reasonLegend');
+  legend.innerHTML = rows.map((r,i)=>`<div class="donut-legend-row" data-reason="${r.id}"><span class="lg-left"><span class="lg-dot" style="background:${colors[i]}"></span><span class="lg-name"></span></span><span class="lg-val">${fmtPct(r.count/total*100)}</span></div>`).join('');
+  [...legend.children].forEach((row,i)=>{
+    row.querySelector('.lg-name').textContent = rows[i].name;
+    row.addEventListener('click', ()=>{ selectedReason = selectedReason===rows[i].id ? null : rows[i].id; renderReasonDonut(); renderRoutesTable(); });
+  });
+}
+
+/* =====================================================================
+   SECTION: RENDER -- SHIPMENTS BY DAY OF WEEK / HOUR
+   ===================================================================== */
+function renderDowHour(){
+  const t = themeColors();
+  const cur = aggregate(filterRecords(currentFilterSet()));
+  Plotly.react('dowChart', [{ type:'bar', x:DOW_LABELS, y:DOW_SHAPE.map(s=>cur.shipments*s), marker:{color:t.s2}, hovertemplate:'%{x}<br>%{y:,.0f} shipments<extra></extra>' }],
+    baseLayout({ xaxis:{gridcolor:'transparent'}, yaxis:{gridcolor:t.grid, zerolinecolor:t.baseline}, margin:{t:8,r:8,b:26,l:40} }), plotlyConfig);
+  Plotly.react('hourChart', [{ type:'bar', x:Array.from({length:24},(_,h)=>h+'h'), y:HOUR_SHAPE.map(s=>cur.shipments*(s/HOUR_SUM)), marker:{color:t.s6}, hovertemplate:'%{x}<br>%{y:,.0f} shipments<extra></extra>' }],
+    baseLayout({ xaxis:{gridcolor:'transparent', dtick:3}, yaxis:{gridcolor:t.grid, zerolinecolor:t.baseline}, margin:{t:8,r:8,b:26,l:40} }), plotlyConfig);
+}
+
+/* =====================================================================
+   SECTION: RENDER -- INVENTORY RISK MATRIX
+   ===================================================================== */
+function renderRiskMatrix(){
+  const points = RISK_POINTS.filter(p => state.origin==='all' || WAREHOUSES.find(w=>w.id===p.warehouseId).region===state.origin);
+  // Likelihood (rows, low->high) derived from days-of-supply being extreme; Impact (columns) from value at risk.
+  const impactBuckets = [ [0,15000],[15000,35000],[35000,65000],[65000,Infinity] ];
+  const likelihoodBuckets = [ [0,10],[10,25],[25,999] ]; // low days-of-supply and very high days-of-supply both signal risk; simplified to 3 bands
+  const grid = likelihoodBuckets.map(()=> impactBuckets.map(()=>0));
+  points.forEach(p=>{
+    const likelihoodIdx = p.daysOfSupply<10 ? 2 : p.daysOfSupply<25 ? 1 : 0; // fewer days of supply = higher stockout likelihood
+    const impactIdx = impactBuckets.findIndex(([lo,hi])=> p.valueAtRisk>=lo && p.valueAtRisk<hi);
+    grid[likelihoodIdx][Math.max(0,impactIdx)]++;
+  });
+  const maxCount = Math.max(1, ...grid.flat());
+  const t = themeColors();
+  const rowLabels = ['High','Medium','Low'];
+  let html = `<div class="risk-axis-y">Likelihood &rarr;</div>`;
+  html += `<div class="axis-label"></div>` + impactBuckets.map((_,i)=>`<div class="axis-label">Impact ${i+1}</div>`).join('');
+  rowLabels.forEach((rl,ri)=>{
+    html += `<div class="axis-label">${rl}</div>`;
+    impactBuckets.forEach((_,ci)=>{
+      const count = grid[ri][ci];
+      const intensity = count/maxCount;
+      const hue = ri===2 || ci===3 ? t.crit : (ri===1 || ci===2) ? t.warn : t.good;
+      html += `<div class="risk-cell" style="background:color-mix(in srgb, ${hue} ${Math.round(25+intensity*65)}%, ${t.surface2});">${count}<span class="cnt-label">SKU clusters</span></div>`;
+    });
+  });
+  const matrixEl = document.getElementById('riskMatrix');
+  matrixEl.style.gridTemplateRows = 'auto repeat(3, 1fr)';
+  matrixEl.innerHTML = html;
+}
+
+/* =====================================================================
+   SECTION: RENDER -- WAREHOUSE HEALTH TREND
+   ===================================================================== */
+function renderWarehouseTrend(){
+  const t = themeColors();
+  const [start,end] = resolveWeekRange(state.weekKey);
+  const weeks = []; for(let i=start;i<=end;i++) weeks.push(i);
+  const baseSet = { origin:state.origin, dest:state.dest, carrier:state.carrier, priority:state.priority, shipType:state.shipType };
+  const series = weeks.map(wi=> warehouseCongestionScore(filterRecords(Object.assign({}, baseSet, {start:wi,end:wi}))));
+  Plotly.react('warehouseTrendChart', [{
+    type:'scatter', mode:'lines', x:weeks.map(wi=>WEEKS[wi].label), y:series, line:{color:t.s4, width:2.5, shape:'spline'}, fill:'tozeroy', fillcolor:t.s4+'22',
+    hovertemplate:'%{x}<br>Congestion: %{y:.0f}/100<extra></extra>',
+  }], baseLayout({ xaxis:{gridcolor:'transparent'}, yaxis:{gridcolor:t.grid, zerolinecolor:t.baseline, range:[0,100]}, margin:{t:10,r:10,b:28,l:40} }), plotlyConfig);
+}
+
+/* =====================================================================
+   SECTION: RENDER -- TOP ROUTES BY RISK (table)
+   ===================================================================== */
+function renderRoutesTable(){
+  let lanes = laneAggregate();
+  if(selectedReason){
+    const cur = currentFilterSet();
+    lanes = lanes.filter(l=>{
+      const recs = filterRecords(cur).filter(r=>r.laneId===l.id);
+      const byReason = {};
+      recs.forEach(r=> byReason[r.reasonId] = (byReason[r.reasonId]||0) + r.delayed);
+      const top = Object.entries(byReason).sort((a,b)=>b[1]-a[1])[0];
+      return top && top[0]===selectedReason;
+    });
+  }
+  lanes.sort((a,b)=>a.otifPct-b.otifPct);
+  const cur = currentFilterSet();
+  const tbody = document.querySelector('#routesTable tbody');
+  tbody.innerHTML = lanes.map(l=>{
+    const recs = filterRecords(cur).filter(r=>r.laneId===l.id);
+    const byReason = {};
+    recs.forEach(r=> byReason[r.reasonId] = (byReason[r.reasonId]||0) + r.delayed);
+    const topReason = Object.entries(byReason).sort((a,b)=>b[1]-a[1])[0];
+    const reasonName = topReason ? DELAY_REASONS.find(r=>r.id===topReason[0]).name : '—';
+    const badgeClass = l.status==='good'?'good':l.status==='warning'?'warning':'critical';
+    return `<tr data-lane="${l.id}"><td>${l.wh.name} &rarr; ${l.region.name}</td><td>${fmtInt(l.shipments)}</td><td><span class="badge ${badgeClass}">${fmtPct(l.otifPct)}</span></td><td>${l.avgTransit.toFixed(1)}d</td><td>${reasonName}</td></tr>`;
+  }).join('');
+  [...tbody.children].forEach(row=>{
+    if(row.dataset.lane===highlightedLaneId) row.classList.add('highlight');
+    row.addEventListener('click', ()=>{
+      const lane = lanes.find(l=>l.id===row.dataset.lane);
+      if(lane) openDrawer(lane);
+    });
+  });
+}
+
+/* =====================================================================
+   SECTION: RENDER -- ALERTS LIST
+   ===================================================================== */
+function renderAlerts(){
+  const cur = currentFilterSet();
+  const items = [];
+  WAREHOUSES.forEach(wh=>{
+    const recs = filterRecords(Object.assign({}, cur, {origin:wh.region}));
+    if(!recs.length) return;
+    const a = aggregate(recs);
+    if(a.otifPct < 88) items.push({ sev:'critical', title:`${wh.name} OTIF at ${fmtPct(a.otifPct)}`, desc:'Below the 88% risk floor for this warehouse.' });
+    else if(a.otifPct < 95) items.push({ sev:'warning', title:`${wh.name} tracking below SLA`, desc:`OTIF at ${fmtPct(a.otifPct)}, target is 95%.` });
+  });
+  CARRIERS.forEach(c=>{
+    const recs = filterRecords(Object.assign({}, cur, {carrier:c.id}));
+    if(!recs.length) return;
+    const a = aggregate(recs);
+    if(a.otifPct < 85) items.push({ sev:'critical', title:`${c.name} underperforming`, desc:`OTIF at ${fmtPct(a.otifPct)} across ${fmtInt(a.shipments)} shipments.` });
+  });
+  const rank = {critical:0, warning:1};
+  items.sort((a,b)=>rank[a.sev]-rank[b.sev]);
+  const top = items.slice(0,6);
+  const list = document.getElementById('alertList');
+  if(!top.length){ list.innerHTML = `<div style="color:var(--text-muted); font-size:12px; padding:10px 0;">No active alerts in this filter slice.</div>`; return; }
+  list.innerHTML = top.map(it=>`<div class="alert-item ${it.sev}"><div class="sev-bar"></div><div><div class="a-title"></div><div class="a-desc"></div></div></div>`).join('');
+  [...list.children].forEach((row,i)=>{ row.querySelector('.a-title').textContent = top[i].title; row.querySelector('.a-desc').textContent = top[i].desc; });
+}
+
+/* =====================================================================
+   SECTION: RENDER -- CARRIER SCENARIO SIMULATOR
+   ===================================================================== */
+function renderSimulator(){
+  const t = themeColors();
+  const cur = currentFilterSet();
+  const records = filterRecords(cur);
+  const base = aggregate(records);
+  const targetCarrier = document.getElementById('simCarrier').value;
+  const reroutePct = state.reroute/100;
+  const others = CARRIERS.filter(c=>c.id!==targetCarrier);
+  const avgOtherReliability = others.reduce((a,c)=>a+c.baseReliability,0)/others.length;
+  const targetRecs = records.filter(r=>r.carrierId===targetCarrier);
+  const shiftedShipments = targetRecs.reduce((a,r)=>a+r.shipments,0) * reroutePct;
+  const shiftedOtifDelta = shiftedShipments * (avgOtherReliability - (CARRIERS.find(c=>c.id===targetCarrier).baseReliability));
+  const projOtifShipments = base.otifShipments + shiftedOtifDelta;
+  const projOtifPct = base.shipments ? Math.min(99, (projOtifShipments/base.shipments)*100) : 0;
+
+  document.getElementById('simBaseline').textContent = fmtPct(base.otifPct);
+  document.getElementById('simProjected').textContent = fmtPct(projOtifPct);
+  Plotly.react('simChart', [{
+    type:'bar', x:['Baseline','Projected'], y:[base.otifPct, projOtifPct], marker:{color:[t.baseline, t.s1]},
+    text:[fmtPct(base.otifPct), fmtPct(projOtifPct)], textposition:'outside', textfont:{color:t.text,size:12},
+    hovertemplate:'%{x}<br>OTIF: %{y:.1f}%<extra></extra>',
+  }], baseLayout({ yaxis:{gridcolor:t.grid, zerolinecolor:t.baseline, ticksuffix:'%', range:[0,105]}, xaxis:{gridcolor:'transparent'}, margin:{t:14,r:8,b:26,l:40} }), plotlyConfig);
+}
+document.getElementById('rerouteSlider').addEventListener('input', e=>{ state.reroute=parseFloat(e.target.value); document.getElementById('rerouteVal').textContent = state.reroute+'%'; renderSimulator(); });
+document.getElementById('simCarrier').addEventListener('change', renderSimulator);
+document.getElementById('simReset').addEventListener('click', ()=>{ state.reroute=0; document.getElementById('rerouteSlider').value=0; document.getElementById('rerouteVal').textContent='0%'; renderSimulator(); });
+
+/* =====================================================================
+   SECTION: ROUTE DETAIL DRAWER
+   ===================================================================== */
+function openDrawer(lane){
+  const t = themeColors();
+  highlightedLaneId = lane.id;
+  const cur = currentFilterSet();
+  const recs = filterRecords(cur).filter(r=>r.laneId===lane.id);
+  const a = aggregate(recs);
+
+  document.getElementById('drawerTitle').textContent = lane.wh.name + ' → ' + lane.region.name;
+  document.getElementById('drawerKpis').innerHTML = `
+    <div class="box"><div class="kicker">OTIF</div><div class="num">${fmtPct(a.otifPct)}</div></div>
+    <div class="box"><div class="kicker">Shipments</div><div class="num">${fmtInt(a.shipments)}</div></div>
+    <div class="box"><div class="kicker">Delayed</div><div class="num">${fmtInt(a.delayed)}</div></div>
+    <div class="box"><div class="kicker">Avg transit</div><div class="num">${a.avgTransit.toFixed(1)}d</div></div>`;
+
+  const byReason = DELAY_REASONS.map(r=>({ name:r.name, count: recs.filter(rec=>rec.reasonId===r.id).reduce((s,rec)=>s+rec.delayed,0) })).filter(r=>r.count>0);
+  const palette = [t.s1,t.s2,t.s3,t.s4,t.s5,t.s6,t.s7,t.s8];
+  Plotly.react('drawerBar', [{ type:'bar', orientation:'h', x:byReason.map(r=>r.count), y:byReason.map(r=>r.name), marker:{color:byReason.map((r,i)=>palette[i%palette.length])}, text:byReason.map(r=>fmtInt(r.count)), textposition:'outside', textfont:{color:t.text,size:10.5}, hovertemplate:'%{y}: %{x}<extra></extra>' }],
+    baseLayout({ yaxis:{gridcolor:'transparent'}, xaxis:{gridcolor:t.grid, zerolinecolor:t.baseline}, margin:{t:6,r:30,b:24,l:120} }), plotlyConfig);
+
+  const [,end] = resolveWeekRange(state.weekKey);
+  const weeksWin = []; for(let i=Math.max(0,end-7); i<=end; i++) weeksWin.push(i);
+  const trendSeries = weeksWin.map(wi=> aggregate(filterRecords(Object.assign({}, cur, {start:wi,end:wi})).filter(r=>r.laneId===lane.id)).otifPct);
+  Plotly.react('drawerTrend', [{ type:'scatter', mode:'lines', x:weeksWin.map(wi=>WEEKS[wi].label), y:trendSeries, line:{color:t.s1,width:2,shape:'spline'}, fill:'tozeroy', fillcolor:t.s1+'22', hovertemplate:'%{x}<br>%{y:.1f}%<extra></extra>' }],
+    baseLayout({ xaxis:{gridcolor:'transparent'}, yaxis:{gridcolor:t.grid, zerolinecolor:t.baseline, ticksuffix:'%'}, margin:{t:10,r:10,b:28,l:40} }), plotlyConfig);
+
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer').setAttribute('aria-hidden','false');
+  document.getElementById('drawerOverlay').classList.add('open');
+  renderMap(); renderRoutesTable();
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer').setAttribute('aria-hidden','true');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  highlightedLaneId = null;
+  renderMap(); renderRoutesTable();
+}
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+
+/* =====================================================================
+   SECTION: DATA DICTIONARY
+   ===================================================================== */
+const DICTIONARY = [
+  ['OTIF %','Share of shipments delivered on time and in full.'],
+  ['On-Time Delivery %','Share of shipments delivered by the promised date.'],
+  ['Delayed Shipments','Shipments currently missing their delivery promise.'],
+  ['At-Risk Orders','Delayed shipments likely to miss SLA if unresolved.'],
+  ['Avg Transit Time','Weighted average transit days across the filtered network.'],
+  ['Inventory Exposure','Dollar value of inventory currently in transit or held.'],
+  ['Backorder Rate','Share of shipments delayed due to inventory shortage.'],
+  ['Warehouse Congestion','Composite 0–100 score blending delay rate and warehouse load.'],
+  ['Route','A warehouse-to-region shipping lane.'],
+  ['Risk Matrix','SKU clusters grouped by stockout likelihood and dollar impact.'],
+];
+document.getElementById('dictGrid').innerHTML = DICTIONARY.map(([term,def])=>`<div class="dict-row"><span class="term">${term}</span><span class="def">${def}</span></div>`).join('');
+
+/* =====================================================================
+   SECTION: SIDEBAR SCROLL-SPY NAVIGATION
+   ===================================================================== */
+const navLinks = [...document.querySelectorAll('.side-link')];
+navLinks.forEach(link=>{
+  link.addEventListener('click', ()=>{
+    const target = document.getElementById(link.dataset.scroll);
+    if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+});
+const navSections = navLinks.map(l=>document.getElementById(l.dataset.scroll)).filter(Boolean);
+const navObserver = new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      const id = entry.target.id;
+      navLinks.forEach(l=> l.classList.toggle('active', l.dataset.scroll===id));
+    }
+  });
+}, { rootMargin:'-30% 0px -60% 0px', threshold:0 });
+navSections.forEach(s=> navObserver.observe(s));
+document.getElementById('viewAlertsBtn').addEventListener('click', ()=> document.getElementById('alerts').scrollIntoView({behavior:'smooth', block:'start'}));
+
+/* =====================================================================
+   SECTION: HUDDLE MODE
+   ===================================================================== */
+function setHuddle(on){ document.body.classList.toggle('huddle-mode', on); }
+document.getElementById('huddleToggle').addEventListener('click', ()=> setHuddle(!document.body.classList.contains('huddle-mode')));
+document.getElementById('huddleExit').addEventListener('click', ()=> setHuddle(false));
+
+/* =====================================================================
+   SECTION: WIRE UP FILTERS
+   ===================================================================== */
+function renderAll(){
+  updateDateBadge();
+  renderKPIs();
+  renderTrend();
+  renderMap();
+  renderReasonDonut();
+  renderDowHour();
+  renderRiskMatrix();
+  renderWarehouseTrend();
+  renderRoutesTable();
+  renderAlerts();
+  renderSimulator();
+}
+[['fWeek','weekKey'],['fOrigin','origin'],['fDest','dest'],['fCarrier','carrier'],['fPriority','priority'],['fShipType','shipType']].forEach(([id,key])=>{
+  document.getElementById(id).addEventListener('change', e=>{ state[key] = e.target.value; renderAll(); });
+});
+document.getElementById('resetFilters').addEventListener('click', ()=>{
+  state.weekKey='8'; state.origin='all'; state.dest='all'; state.carrier='all'; state.priority='all'; state.shipType='all';
+  selectedReason = null;
+  document.getElementById('fWeek').value='8'; document.getElementById('fOrigin').value='all'; document.getElementById('fDest').value='all';
+  document.getElementById('fCarrier').value='all'; document.getElementById('fPriority').value='all'; document.getElementById('fShipType').value='all';
+  renderAll();
+});
+
+renderAll();
+</script>
+</body>
+</html>

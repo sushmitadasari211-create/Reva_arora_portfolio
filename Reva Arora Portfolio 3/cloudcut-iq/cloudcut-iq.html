@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<!--
+LINKEDIN CAPTION:
+Enterprises waste billions on cloud and SaaS every year.
+I built CloudCut IQ, a browser-based FinOps dashboard that estimates cloud waste, unused licenses, duplicate tools, and renewal risk in one place.
+It includes a waste map, cloud efficiency score, SaaS utilization analysis, renewal risk radar, and an auto-generated savings report.
+#FinOps #CloudCost #SaaS #DataAnalytics #PowerBI #AnalyticsEngineering
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CloudCut IQ — Cloud &amp; SaaS Spend Waste Detector</title>
+
+<!-- Tailwind CSS (CDN, no build step) -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Prism.js theme for the Python Model tab code blocks -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" />
+
+<style>
+  /* ===== Global look & feel ===== */
+  :root{
+    --purple:#6C5CE7;
+    --teal:#00D2A0;
+    --coral:#FF6B6B;
+    --amber:#FDCB6E;
+    --blue:#4A90E2;
+    --pink:#FD79A8;
+    --slate:#636E72;
+  }
+  html,body{
+    background: linear-gradient(160deg,#eef3ff 0%, #f2ecff 45%, #f7ecff 100%);
+    min-height:100%;
+    font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+    color:#2d2d3a;
+  }
+  ::-webkit-scrollbar{height:10px;width:10px;}
+  ::-webkit-scrollbar-thumb{background:#c9c2f0;border-radius:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ===== Cards & hover-lift ===== */
+  .card{
+    background:#ffffff;
+    border-radius:1.1rem;
+    box-shadow: 0 4px 18px rgba(108,92,231,0.10), 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .hover-lift:hover{
+    transform: translateY(-4px);
+    box-shadow: 0 14px 30px rgba(108,92,231,0.18), 0 2px 6px rgba(0,0,0,0.06);
+  }
+
+  /* ===== Sticky gradient navbar ===== */
+  .navbar-gradient{
+    background: linear-gradient(90deg, var(--purple), #8b6cf0 40%, var(--pink) 100%);
+  }
+
+  /* ===== Ticker ===== */
+  .ticker-track{
+    display:flex;
+    width:max-content;
+    animation: ticker-scroll 32s linear infinite;
+  }
+  .ticker-track:hover{ animation-play-state: paused; }
+  @keyframes ticker-scroll{
+    0%{ transform: translateX(0); }
+    100%{ transform: translateX(-50%); }
+  }
+
+  /* ===== Tabs ===== */
+  .tab-btn{
+    transition: all .15s ease;
+    border-bottom: 3px solid transparent;
+    white-space:nowrap;
+  }
+  .tab-btn.active{
+    color: var(--purple);
+    border-bottom-color: var(--purple);
+    font-weight:700;
+  }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; animation: fade-in .25s ease; }
+  @keyframes fade-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ===== Waste map tiles ===== */
+  .waste-tile{
+    border-radius:1rem;
+    color:#fff;
+    padding:1rem;
+    cursor:pointer;
+    min-height:110px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    transition: transform .15s ease, box-shadow .15s ease, outline .15s ease;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+  .waste-tile:hover{ transform: scale(1.03); box-shadow: 0 10px 22px rgba(0,0,0,0.20); }
+  .waste-tile.selected{ outline: 3px solid #2d2d3a; outline-offset:2px; }
+
+  /* ===== Heatmap ===== */
+  .heat-cell{
+    border-radius:.6rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    font-weight:600;
+    color:#1c1c28;
+    min-height:64px;
+    transition: transform .12s ease, outline .12s ease;
+  }
+  .heat-cell:hover{ transform: scale(1.05); }
+  .heat-cell.selected{ outline:3px solid #2d2d3a; outline-offset:1px; }
+
+  /* ===== Badges ===== */
+  .badge{ padding:.2rem .65rem; border-radius:9999px; font-size:.72rem; font-weight:700; letter-spacing:.02em; }
+  .badge-high{ background:#ffe3e3; color:#c0392b; }
+  .badge-medium{ background:#fff3cd; color:#a6790a; }
+  .badge-low{ background:#d9fbe8; color:#0f8a52; }
+
+  /* ===== Contract cards ===== */
+  .contract-card{ border-radius:1rem; border:1px solid #eee0ff; }
+
+  /* ===== Table ===== */
+  th.sortable{ cursor:pointer; user-select:none; }
+  th.sortable:hover{ color:var(--purple); }
+  .sort-arrow{ font-size:.7rem; margin-left:.25rem; opacity:.6; }
+
+  /* ===== Carousel slides ===== */
+  .slide{
+    border-radius:1.3rem;
+    color:#fff;
+    padding:2.4rem 2rem;
+    min-height:260px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    box-shadow:0 10px 26px rgba(0,0,0,0.15);
+  }
+
+  /* ===== Loading spinner ===== */
+  .spinner{
+    width:18px;height:18px;border-radius:50%;
+    border:3px solid rgba(255,255,255,0.5);
+    border-top-color:#fff;
+    animation: spin .7s linear infinite;
+    display:inline-block;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* ===== Gauge center label ===== */
+  .gauge-wrap{ position:relative; }
+  .gauge-label{
+    position:absolute; left:0; right:0; text-align:center;
+    top:62%; transform:translateY(-50%);
+  }
+
+  /* ===== Range input accent ===== */
+  input[type=range]{ accent-color:#6C5CE7; }
+
+  /* ===== Copy-box ===== */
+  .copy-box{ background:#1e1b2e; color:#e6e1ff; border-radius:.9rem; }
+
+  code[class*="language-"], pre[class*="language-"]{ font-size:.82rem; border-radius:.8rem; }
+
+  @media (max-width: 640px){
+    .slide{ padding:1.6rem 1.2rem; min-height:200px; }
+  }
+</style>
+</head>
+<body class="pb-16">
+
+<!-- ============================= NAVBAR ============================= -->
+<header class="navbar-gradient sticky top-0 z-50 shadow-lg">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-2xl">☁️</div>
+      <div>
+        <div class="text-white font-extrabold text-lg leading-tight">CloudCut IQ</div>
+        <div class="text-white/80 text-[11px] hidden sm:block">Cloud &amp; SaaS Spend Waste Detector</div>
+      </div>
+    </div>
+    <div class="text-white/90 text-sm font-medium hidden md:block text-center flex-1">
+      Cloud &amp; SaaS Spend Waste Detector
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="https://github.com" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition">GitHub</a>
+      <button id="navExportBtn" class="px-3 py-2 rounded-lg bg-white text-[#6C5CE7] hover:bg-white/90 text-sm font-bold transition shadow">Export Report</button>
+      <a href="#" class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition hidden sm:inline-block">Portfolio</a>
+    </div>
+  </div>
+</header>
+
+<!-- ============================= TICKER ============================= -->
+<div class="bg-[#2d2440] overflow-hidden py-2 border-b border-[#3d3260]">
+  <div class="ticker-track" id="tickerTrack">
+    <!-- duplicated in JS for seamless loop -->
+  </div>
+</div>
+
+<main class="max-w-7xl mx-auto px-4 mt-6 space-y-6">
+
+  <!-- ============================= CONFIGURATOR ============================= -->
+  <section class="card hover-lift p-5 md:p-6">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+      <h2 class="text-xl font-extrabold text-[#2d2d3a]">🔧 Configure Your Stack</h2>
+      <span class="text-xs text-gray-500">All values recalculate instantly on scan — no data leaves your browser.</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">Industry</label>
+        <select id="inputIndustry" class="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]">
+          <option>Technology</option>
+          <option>Finance</option>
+          <option>Healthcare</option>
+          <option>Retail</option>
+          <option>Manufacturing</option>
+          <option>Media</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">Company Size</label>
+        <select id="inputCompanySize" class="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]">
+          <option>Startup</option>
+          <option selected>Mid-Market</option>
+          <option>Large</option>
+          <option>Enterprise</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">Cloud Provider</label>
+        <select id="inputProvider" class="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]">
+          <option>AWS</option>
+          <option>Azure</option>
+          <option>GCP</option>
+          <option>Multi-Cloud</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">Annual Cloud Spend: <span id="cloudSpendLabel" class="text-[#6C5CE7] font-bold"></span></label>
+        <input type="range" id="inputCloudSpend" min="100000" max="50000000" step="50000" value="4000000" class="w-full" />
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">SaaS Tools in Use: <span id="saasToolsLabel" class="text-[#6C5CE7] font-bold"></span></label>
+        <input type="range" id="inputSaasTools" min="20" max="500" step="1" value="120" class="w-full" />
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1 text-gray-700">Employee Count: <span id="employeesLabel" class="text-[#6C5CE7] font-bold"></span></label>
+        <input type="range" id="inputEmployees" min="100" max="100000" step="100" value="2500" class="w-full" />
+      </div>
+    </div>
+    <div class="mt-5 flex items-center gap-3">
+      <button id="scanBtn" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#FD79A8] text-white font-bold shadow-lg hover:shadow-xl transition flex items-center gap-2">
+        <span id="scanBtnText">🔍 Scan My Stack</span>
+      </button>
+      <span id="scanStatus" class="text-sm text-gray-500"></span>
+    </div>
+  </section>
+
+  <!-- ============================= ALERT BANNER ============================= -->
+  <section id="alertBanner" class="rounded-xl p-4 text-white font-semibold shadow-lg bg-gradient-to-r from-[#FF6B6B] to-[#FD79A8] flex items-start gap-3">
+    <span class="text-2xl">⚠️</span>
+    <span id="alertBannerText">Configure your stack and click "Scan My Stack" to see your results.</span>
+  </section>
+
+  <!-- ============================= KPI CARDS ============================= -->
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="card hover-lift p-5 border-t-4" style="border-color:#6C5CE7">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wide">Total Estimated Waste</div>
+      <div id="kpiTotalWaste" class="text-3xl font-extrabold text-[#6C5CE7] mt-1">$0</div>
+      <div class="text-xs text-gray-400 mt-1">per year across cloud + SaaS</div>
+    </div>
+    <div class="card hover-lift p-5 border-t-4" style="border-color:#FF6B6B">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wide">Cloud Waste %</div>
+      <div id="kpiCloudWastePct" class="text-3xl font-extrabold text-[#FF6B6B] mt-1">0%</div>
+      <div class="text-xs text-gray-400 mt-1">of total cloud infrastructure spend</div>
+    </div>
+    <div class="card hover-lift p-5 border-t-4" style="border-color:#FDCB6E">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wide">Unused SaaS Licenses</div>
+      <div id="kpiUnusedLicenses" class="text-3xl font-extrabold text-[#e0a800] mt-1">$0</div>
+      <div class="text-xs text-gray-400 mt-1">paid seats sitting idle</div>
+    </div>
+    <div class="card hover-lift p-5 border-t-4" style="border-color:#00D2A0">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wide">Contracts at Renewal Risk</div>
+      <div id="kpiContractsRisk" class="text-3xl font-extrabold text-[#00A886] mt-1">0</div>
+      <div class="text-xs text-gray-400 mt-1">auto-renewing without review</div>
+    </div>
+  </section>
+
+  <!-- ============================= TABS ============================= -->
+  <section class="card p-2 md:p-3">
+    <nav class="flex gap-1 overflow-x-auto px-1" id="tabNav">
+      <button class="tab-btn active px-4 py-3 text-sm" data-tab="wastemap">🗺️ Waste Map</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="cloud">☁️ Cloud Breakdown</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="saas">🧩 SaaS Utilization</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="renewal">⏳ Renewal Risk Radar</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="report">📋 Savings Report</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="python">🐍 Python Model</button>
+      <button class="tab-btn px-4 py-3 text-sm" data-tab="carousel">📱 Social Carousel</button>
+    </nav>
+  </section>
+
+  <!-- ===================== TAB 1: WASTE MAP ===================== -->
+  <section id="tab-wastemap" class="tab-panel active space-y-5">
+    <div class="card p-5">
+      <h3 class="font-extrabold text-lg mb-1">Waste Map</h3>
+      <p class="text-sm text-gray-500 mb-4">Tile size reflects annual waste dollars. Click any tile for details.</p>
+      <div id="wasteTileGrid" class="flex flex-wrap gap-3"></div>
+    </div>
+    <div id="wasteDetailPanel" class="card p-5 border-l-4" style="border-color:#6C5CE7">
+      <div class="text-sm text-gray-400">Click a tile above or a bubble below to see details here.</div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">Waste by Category</h3>
+        <canvas id="chartWasteDoughnut" height="260"></canvas>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">Cost vs Utilization (20 Services)</h3>
+        <canvas id="chartBubble" height="260"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 2: CLOUD BREAKDOWN ===================== -->
+  <section id="tab-cloud" class="tab-panel space-y-5">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div class="card hover-lift p-5">
+        <div class="text-xs font-bold text-gray-500 uppercase">Idle Compute Cost</div>
+        <div id="miniIdleCompute" class="text-2xl font-extrabold text-[#6C5CE7] mt-1">$0</div>
+      </div>
+      <div class="card hover-lift p-5">
+        <div class="text-xs font-bold text-gray-500 uppercase">Orphaned Storage Cost</div>
+        <div id="miniOrphanedStorage" class="text-2xl font-extrabold text-[#00D2A0] mt-1">$0</div>
+      </div>
+      <div class="card hover-lift p-5">
+        <div class="text-xs font-bold text-gray-500 uppercase">Right-Sizing Opportunity</div>
+        <div id="miniRightSizing" class="text-2xl font-extrabold text-[#4A90E2] mt-1">$0</div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">Spend by Resource Type</h3>
+        <canvas id="chartStackedBar" height="260"></canvas>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">Cloud Efficiency Score</h3>
+        <div class="gauge-wrap">
+          <canvas id="chartGauge" height="200"></canvas>
+          <div class="gauge-label">
+            <div id="gaugeScoreText" class="text-3xl font-extrabold text-[#6C5CE7]">0</div>
+            <div class="text-xs text-gray-400">Efficiency Score</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">Savings Waterfall</h3>
+        <canvas id="chartWaterfall" height="260"></canvas>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-3">12-Month Cloud Spend vs Waste Trend</h3>
+        <canvas id="chartTrend" height="260"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 3: SAAS UTILIZATION ===================== -->
+  <section id="tab-saas" class="tab-panel space-y-5">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="card p-5">
+        <h3 class="font-extrabold text-lg mb-1">Utilization Heatmap by Department</h3>
+        <p class="text-sm text-gray-500 mb-3">Click a cell for details.</p>
+        <div id="heatmapGrid"></div>
+      </div>
+      <div id="heatmapDetail" class="card p-5 border-l-4" style="border-color:#00D2A0">
+        <div class="text-sm text-gray-400">Click a heatmap cell to see department details here.</div>
+      </div>
+    </div>
+    <div class="card p-5">
+      <h3 class="font-extrabold text-lg mb-3">Top 10 SaaS Tools by Wasted Spend</h3>
+      <canvas id="chartSaasBar" height="260"></canvas>
+    </div>
+    <div class="card p-5">
+      <h3 class="font-extrabold text-lg mb-3">Duplicate Tool Categories</h3>
+      <div id="duplicateCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+    <div class="card p-5 max-w-xl">
+      <h3 class="font-extrabold text-lg mb-3">License Status Breakdown</h3>
+      <canvas id="chartSaasStatus" height="260"></canvas>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 4: RENEWAL RISK RADAR ===================== -->
+  <section id="tab-renewal" class="tab-panel space-y-5">
+    <div id="nextActionCard" class="card p-5 border-l-4 bg-gradient-to-r from-[#fff5f5] to-white" style="border-color:#FF6B6B"></div>
+    <div class="card p-5">
+      <h3 class="font-extrabold text-lg mb-3">Contracts (15)</h3>
+      <div id="contractCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+    <div class="card p-5">
+      <h3 class="font-extrabold text-lg mb-3">Renewal Timing vs Annual Value</h3>
+      <canvas id="chartScatter" height="260"></canvas>
+    </div>
+    <div class="card p-5 overflow-x-auto">
+      <h3 class="font-extrabold text-lg mb-3">All Contracts</h3>
+      <table class="w-full text-sm" id="contractTable">
+        <thead>
+          <tr class="text-left border-b-2 border-gray-100">
+            <th class="sortable py-2 pr-3" data-key="vendor">Vendor<span class="sort-arrow"></span></th>
+            <th class="sortable py-2 pr-3" data-key="annualValue">Annual Value<span class="sort-arrow"></span></th>
+            <th class="sortable py-2 pr-3" data-key="renewalDate">Renewal Date<span class="sort-arrow"></span></th>
+            <th class="sortable py-2 pr-3" data-key="autoRenew">Auto Renew<span class="sort-arrow"></span></th>
+            <th class="sortable py-2 pr-3" data-key="riskLevel">Risk<span class="sort-arrow"></span></th>
+            <th class="py-2 pr-3">Action</th>
+          </tr>
+        </thead>
+        <tbody id="contractTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 5: SAVINGS REPORT ===================== -->
+  <section id="tab-report" class="tab-panel space-y-5">
+    <div class="flex flex-wrap gap-3">
+      <button id="copyReportBtn" class="px-4 py-2 rounded-lg bg-[#6C5CE7] text-white font-semibold text-sm hover:opacity-90 transition">📋 Copy Report</button>
+      <button id="exportReportBtn" class="px-4 py-2 rounded-lg bg-[#00D2A0] text-white font-semibold text-sm hover:opacity-90 transition">⬇️ Export as Text File</button>
+      <button id="regenerateReportBtn" class="px-4 py-2 rounded-lg bg-[#4A90E2] text-white font-semibold text-sm hover:opacity-90 transition">🔄 Regenerate</button>
+      <span id="reportCopyStatus" class="text-sm text-gray-500 self-center"></span>
+    </div>
+    <div id="reportContainer" class="card p-6 space-y-6"></div>
+  </section>
+
+  <!-- ===================== TAB 6: PYTHON MODEL ===================== -->
+  <section id="tab-python" class="tab-panel space-y-5">
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-extrabold text-lg">1. Cloud Waste Formula</h3>
+        <button class="copy-code-btn px-3 py-1.5 rounded-lg bg-[#6C5CE7] text-white text-xs font-semibold" data-target="code1">Copy</button>
+      </div>
+      <pre><code id="code1" class="language-python">def cloud_waste(cloud_spend, industry_mult, size_mult, provider_factor):
+    """Estimate annual cloud waste in dollars."""
+    base_pct = 0.295
+    adjustment = (industry_mult - 1) * 0.08 + (provider_factor - 1) * 0.06
+    adjustment -= (size_mult - 1) * 0.02
+    waste_pct = min(max(base_pct + adjustment, 0.27), 0.32)
+    return cloud_spend * waste_pct, waste_pct
+</code></pre>
+    </div>
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-extrabold text-lg">2. SaaS Utilization Scoring</h3>
+        <button class="copy-code-btn px-3 py-1.5 rounded-lg bg-[#00D2A0] text-white text-xs font-semibold" data-target="code2">Copy</button>
+      </div>
+      <pre><code id="code2" class="language-python">def saas_unused_pct(saas_tools, size_mult):
+    """Estimate the share of paid SaaS licenses that go unused."""
+    tool_factor = (saas_tools - 20) / 480 * 0.15
+    size_factor = (size_mult - 1) * 0.05
+    unused_pct = 0.35 + tool_factor + size_factor
+    return min(max(unused_pct, 0.35), 0.55)
+
+def saas_waste_breakdown(annual_saas_spend, unused_pct):
+    total_waste = annual_saas_spend * unused_pct
+    return {
+        "unused_licenses": total_waste * 0.60,
+        "duplicate_tools": total_waste * 0.25,
+        "auto_renewed":    total_waste * 0.10,
+        "shadow_it":       total_waste * 0.05,
+    }
+</code></pre>
+    </div>
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-extrabold text-lg">3. Renewal Risk Scoring</h3>
+        <button class="copy-code-btn px-3 py-1.5 rounded-lg bg-[#FF6B6B] text-white text-xs font-semibold" data-target="code3">Copy</button>
+      </div>
+      <pre><code id="code3" class="language-python">def renewal_risk(days_until_renewal, auto_renew, annual_value, avg_value):
+    """Classify a contract's renewal risk as High, Medium, or Low."""
+    score = 0
+    if days_until_renewal <= 30:
+        score += 2
+    elif days_until_renewal <= 90:
+        score += 1
+
+    if auto_renew:
+        score += 1
+
+    if annual_value > avg_value * 1.5:
+        score += 1
+
+    if score >= 3:
+        return "High"
+    elif score >= 1:
+        return "Medium"
+    return "Low"
+</code></pre>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 7: SOCIAL CAROUSEL ===================== -->
+  <section id="tab-carousel" class="tab-panel space-y-4">
+    <div class="slide" style="background:linear-gradient(135deg,#6C5CE7,#4A90E2);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 1 · Hook</div>
+      <div class="text-3xl md:text-4xl font-extrabold mt-2" id="slide1Text">You're probably wasting millions on cloud &amp; SaaS right now.</div>
+      <div class="mt-3 opacity-90">Here's how to find it — in under 5 minutes.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#FF6B6B,#FD79A8);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 2 · The Hidden Leaks</div>
+      <div class="text-2xl md:text-3xl font-extrabold mt-2">Idle compute. Orphaned storage. Duplicate tools. Auto-renewed contracts.</div>
+      <div class="mt-3 opacity-90">None of these show up on a normal invoice — they hide in plain sight.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#00D2A0,#4A90E2);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 3 · Waste Map Insight</div>
+      <div class="text-2xl md:text-3xl font-extrabold mt-2" id="slide3Text">Your #1 leak is costing you $0/year.</div>
+      <div class="mt-3 opacity-90">That's before you even look at SaaS.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#FDCB6E,#FF6B6B);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 4 · Savings Waterfall</div>
+      <div class="text-2xl md:text-3xl font-extrabold mt-2" id="slide4Text">Right-sizing alone can recover $0/year.</div>
+      <div class="mt-3 opacity-90">No new tools required — just visibility.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#6C5CE7,#FD79A8);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 5 · Renewal Risk Insight</div>
+      <div class="text-2xl md:text-3xl font-extrabold mt-2" id="slide5Text">0 contracts are about to auto-renew without review.</div>
+      <div class="mt-3 opacity-90">Every one of them is a negotiation you're leaving on the table.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#4A90E2,#6C5CE7);">
+      <div class="text-sm font-bold uppercase tracking-widest opacity-80">Slide 6 · CTA</div>
+      <div class="text-2xl md:text-3xl font-extrabold mt-2">Run the scan on your own stack.</div>
+      <div class="mt-3 opacity-90">Built with CloudCut IQ — a free, browser-based FinOps dashboard.</div>
+    </div>
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-extrabold text-lg">LinkedIn Caption</h3>
+        <button id="copyCaptionBtn" class="px-3 py-1.5 rounded-lg bg-[#6C5CE7] text-white text-xs font-semibold">Copy Caption</button>
+      </div>
+      <div class="copy-box p-4 text-sm whitespace-pre-wrap" id="captionBox">Enterprises waste billions on cloud and SaaS every year.
+I built CloudCut IQ, a browser-based FinOps dashboard that estimates cloud waste, unused licenses, duplicate tools, and renewal risk in one place.
+It includes a waste map, cloud efficiency score, SaaS utilization analysis, renewal risk radar, and an auto-generated savings report.
+#FinOps #CloudCost #SaaS #DataAnalytics #PowerBI #AnalyticsEngineering</div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="text-center text-xs text-gray-400 mt-10 pb-4">
+  CloudCut IQ — built with Tailwind CSS &amp; Chart.js. All calculations run locally in your browser. No data is ever sent anywhere.
+</footer>
+
+<!-- ============================= LIBRARIES ============================= -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-clike.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+
+<script>
+/* =====================================================================
+   CLOUDCUT IQ — APPLICATION LOGIC
+   Single appState object holds all inputs, derived model data, and
+   live Chart.js instances so tabs/controls never duplicate listeners
+   or leak stale charts.
+   ===================================================================== */
+
+const appState = {
+  inputs: {
+    industry: 'Technology',
+    companySize: 'Mid-Market',
+    provider: 'AWS',
+    cloudSpend: 4000000,
+    saasTools: 120,
+    employees: 2500
+  },
+  model: null,
+  charts: {},
+  activeTab: 'wastemap',
+  selectedCategoryKey: null,
+  selectedServiceName: null,
+  selectedHeatCell: null,
+  sort: { key: null, dir: 1 }
+};
+
+// Register Chart.js plugins once, globally.
+Chart.register(ChartDataLabels, window['chartjs-plugin-annotation']);
+
+/* ===================== STATIC REFERENCE DATA ===================== */
+
+const INDUSTRY_MULT = { Technology: 1.15, Finance: 1.05, Healthcare: 0.95, Retail: 1.0, Manufacturing: 0.9, Media: 1.1 };
+const SIZE_MULT = { Startup: 0.85, 'Mid-Market': 1.0, Large: 1.15, Enterprise: 1.3 };
+const PROVIDER_FACTOR = { AWS: 1.05, Azure: 1.0, GCP: 0.95, 'Multi-Cloud': 1.12 };
+
+const CATEGORY_COLORS = {
+  Compute: '#6C5CE7',
+  Storage: '#00D2A0',
+  Network: '#4A90E2',
+  Database: '#FDCB6E',
+  SaaS: '#FD79A8'
+};
+
+const WASTE_CATEGORY_META = [
+  { key: 'idleCompute', name: 'Idle Compute', color: '#6C5CE7',
+    why: 'Instances and clusters keep running at low CPU utilization outside business hours, on weekends, or after a project ends because nobody scheduled shutdowns or configured autoscaling.',
+    rec: 'Implement autoscaling policies and scheduled shutdowns for non-production environments, and right-size instance families based on actual CPU/memory usage.' },
+  { key: 'orphanedStorage', name: 'Orphaned Storage', color: '#00D2A0',
+    why: 'Snapshots, backups, and volumes are left behind after instances are terminated or migrated, and nobody owns a cleanup process.',
+    rec: 'Set automated lifecycle policies to archive or delete storage older than a retention threshold, and require an owner tag on every volume.' },
+  { key: 'overProvisioned', name: 'Over-Provisioned Instances', color: '#4A90E2',
+    why: "Teams over-allocate CPU, memory, and IOPS \"to be safe,\" resulting in reserved capacity that sits idle even at peak load.",
+    rec: 'Use utilization-based right-sizing recommendations and shift tolerant workloads to burstable or spot instance families.' },
+  { key: 'unusedLicenses', name: 'Unused SaaS Licenses', color: '#FF6B6B',
+    why: 'Employees get a license when they join a project or trial a tool, but licenses are rarely revoked when usage stops or roles change.',
+    rec: 'Run a quarterly access review, auto-deprovision licenses after 60 days of inactivity, and downgrade seats to lower tiers where possible.' },
+  { key: 'duplicateTools', name: 'Duplicate Tools', color: '#FDCB6E',
+    why: 'Different teams independently buy tools that serve the same function (e.g., three project management tools) with no shared procurement process.',
+    rec: 'Consolidate to one vendor per function, negotiate a single enterprise-wide agreement, and sunset overlapping contracts at their next renewal.' },
+  { key: 'autoRenewed', name: 'Auto-Renewed Contracts', color: '#FD79A8',
+    why: 'Contracts silently auto-renew because no one owns tracking renewal dates, locking in another 12 months of spend without a usage or pricing review.',
+    rec: 'Centralize renewal dates in a tracker with 90-day alerts, and require a usage review before every renewal is approved.' },
+  { key: 'shadowIT', name: 'Shadow IT', color: '#636E72',
+    why: 'Employees and teams sign up for tools with a corporate card outside procurement, so the tools never appear in a central inventory or security review.',
+    rec: 'Run a SaaS discovery / SSO audit to surface ungoverned tools, then route new purchases through a lightweight approval workflow.' }
+];
+
+// 10 cloud infrastructure services + 10 SaaS tools = 20 services for the bubble chart.
+const SERVICES = [
+  { name: 'EC2 Analytics Cluster', category: 'Compute', utilization: 22, weight: 0.10 },
+  { name: 'Idle S3 Backup Archive', category: 'Storage', utilization: 6, weight: 0.06 },
+  { name: 'RDS Postgres Prod', category: 'Database', utilization: 63, weight: 0.07 },
+  { name: 'Snowflake Compute Pool', category: 'Database', utilization: 34, weight: 0.09 },
+  { name: 'Lambda Functions Suite', category: 'Compute', utilization: 71, weight: 0.04 },
+  { name: 'EBS Orphaned Volumes', category: 'Storage', utilization: 4, weight: 0.03 },
+  { name: 'CloudFront CDN', category: 'Network', utilization: 78, weight: 0.04 },
+  { name: 'Elastic Load Balancer Pool', category: 'Network', utilization: 55, weight: 0.03 },
+  { name: 'GCP BigQuery Warehouse', category: 'Database', utilization: 52, weight: 0.06 },
+  { name: 'Azure Idle VM Pool', category: 'Compute', utilization: 12, weight: 0.07 },
+  { name: 'Salesforce Enterprise', category: 'SaaS', utilization: 66, weight: 0.08 },
+  { name: 'HubSpot Sales Pro', category: 'SaaS', utilization: 38, weight: 0.05 },
+  { name: 'Slack Grid', category: 'SaaS', utilization: 82, weight: 0.04 },
+  { name: 'Zoom Enterprise', category: 'SaaS', utilization: 58, weight: 0.03 },
+  { name: 'Jira Software', category: 'SaaS', utilization: 74, weight: 0.03 },
+  { name: 'Figma Org', category: 'SaaS', utilization: 44, weight: 0.04 },
+  { name: 'Confluence Data Center', category: 'SaaS', utilization: 27, weight: 0.03 },
+  { name: 'Datadog APM', category: 'SaaS', utilization: 48, weight: 0.04 },
+  { name: 'Okta Identity Cloud', category: 'SaaS', utilization: 69, weight: 0.02 },
+  { name: 'DocuSign Business Pro', category: 'SaaS', utilization: 21, weight: 0.05 }
+];
+
+const DUPLICATE_GROUPS = [
+  { category: 'Communication', tools: ['Slack Grid', 'Zoom Enterprise', 'Microsoft Teams'], weight: 0.25 },
+  { category: 'Project Management', tools: ['Jira Software', 'Asana', 'Monday.com'], weight: 0.20 },
+  { category: 'Design', tools: ['Figma Org', 'Adobe XD', 'Sketch'], weight: 0.15 },
+  { category: 'Storage', tools: ['Dropbox Business', 'Google Drive Enterprise', 'Box'], weight: 0.18 },
+  { category: 'CRM', tools: ['Salesforce Enterprise', 'HubSpot Sales Pro', 'Zoho CRM'], weight: 0.22 }
+];
+
+const DEPARTMENTS = [
+  { name: 'Engineering', profile: [0.10, 0.15, 0.30, 0.45] },
+  { name: 'Sales', profile: [0.15, 0.20, 0.30, 0.35] },
+  { name: 'Marketing', profile: [0.20, 0.25, 0.30, 0.25] },
+  { name: 'HR', profile: [0.30, 0.30, 0.25, 0.15] },
+  { name: 'Finance', profile: [0.25, 0.30, 0.25, 0.20] },
+  { name: 'Support', profile: [0.15, 0.20, 0.35, 0.30] }
+];
+const HEAT_BUCKETS = ['0-25%', '25-50%', '50-75%', '75-100%'];
+const HEAT_COLORS = ['#ffd2d2', '#ffe6b3', '#c9f3d8', '#9be8bb'];
+
+const CONTRACT_VENDORS = [
+  { vendor: 'Salesforce Enterprise', weight: 0.14, days: 12, autoRenew: true },
+  { vendor: 'AWS Enterprise Agreement', weight: 0.16, days: 340, autoRenew: true },
+  { vendor: 'Microsoft 365 E5', weight: 0.09, days: 45, autoRenew: false },
+  { vendor: 'Snowflake Annual', weight: 0.08, days: 200, autoRenew: true },
+  { vendor: 'Datadog Pro', weight: 0.04, days: 8, autoRenew: true },
+  { vendor: 'Zoom Enterprise', weight: 0.03, days: 120, autoRenew: false },
+  { vendor: 'Slack Grid', weight: 0.04, days: 300, autoRenew: true },
+  { vendor: 'Workday HCM', weight: 0.10, days: 5, autoRenew: true },
+  { vendor: 'ServiceNow ITSM', weight: 0.07, days: 275, autoRenew: false },
+  { vendor: 'Okta Identity', weight: 0.03, days: 60, autoRenew: true },
+  { vendor: 'DocuSign Business', weight: 0.02, days: 400, autoRenew: false },
+  { vendor: 'Adobe Creative Cloud', weight: 0.05, days: 150, autoRenew: false },
+  { vendor: 'Atlassian Suite', weight: 0.05, days: 22, autoRenew: true },
+  { vendor: 'SAP Concur', weight: 0.06, days: 180, autoRenew: false },
+  { vendor: 'NetSuite ERP', weight: 0.04, days: 90, autoRenew: true }
+];
+
+const TICKER_FACTS = [
+  '💰 $723B cloud spend in 2026',
+  '🔥 $200B+ wasted every year',
+  '🧩 291 SaaS apps per enterprise',
+  '📉 51% of licenses go unused',
+  '📊 $18M average annual software waste'
+];
+
+/* ===================== HELPER FUNCTIONS ===================== */
+
+function formatCurrency(value, opts) {
+  opts = opts || {};
+  const decimals = opts.decimals != null ? opts.decimals : 0;
+  return '$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function formatCompact(value) {
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(0) + 'K';
+  return sign + '$' + abs.toFixed(0);
+}
+
+function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+
+function readInputsFromForm() {
+  appState.inputs.industry = document.getElementById('inputIndustry').value;
+  appState.inputs.companySize = document.getElementById('inputCompanySize').value;
+  appState.inputs.provider = document.getElementById('inputProvider').value;
+  appState.inputs.cloudSpend = Number(document.getElementById('inputCloudSpend').value);
+  appState.inputs.saasTools = Number(document.getElementById('inputSaasTools').value);
+  appState.inputs.employees = Number(document.getElementById('inputEmployees').value);
+}
+
+function updateSliderLabels() {
+  document.getElementById('cloudSpendLabel').textContent = formatCurrency(document.getElementById('inputCloudSpend').value);
+  document.getElementById('saasToolsLabel').textContent = document.getElementById('inputSaasTools').value + ' tools';
+  document.getElementById('employeesLabel').textContent = Number(document.getElementById('inputEmployees').value).toLocaleString('en-US') + ' employees';
+}
+
+/* ===================== CENTRAL DATA MODEL ===================== */
+
+function calculateModel(inputs) {
+  const industryMult = INDUSTRY_MULT[inputs.industry];
+  const sizeMult = SIZE_MULT[inputs.companySize];
+  const providerFactor = PROVIDER_FACTOR[inputs.provider];
+
+  // --- Cloud waste ---
+  const cloudWastePct = clamp(0.295 + (industryMult - 1) * 0.08 + (providerFactor - 1) * 0.06 - (sizeMult - 1) * 0.02, 0.27, 0.32);
+  const cloudWasteTotal = inputs.cloudSpend * cloudWastePct;
+  const idleCompute = cloudWasteTotal * 0.38;
+  const orphanedStorage = cloudWasteTotal * 0.24;
+  const overProvisioned = cloudWasteTotal - idleCompute - orphanedStorage;
+
+  // --- SaaS waste ---
+  const avgToolAnnualCost = (1500 + (inputs.employees / 100000) * 4000) * sizeMult * industryMult;
+  const annualSaaSSpend = inputs.saasTools * avgToolAnnualCost;
+  const saasUnusedPct = clamp(0.35 + (inputs.saasTools - 20) / 480 * 0.15 + (sizeMult - 1) * 0.05, 0.35, 0.55);
+  const saasWasteTotal = annualSaaSSpend * saasUnusedPct;
+  const unusedLicenses = saasWasteTotal * 0.60;
+  const duplicateTools = saasWasteTotal * 0.25;
+  const autoRenewed = saasWasteTotal * 0.10;
+  const shadowIT = saasWasteTotal * 0.05;
+
+  const totalWaste = cloudWasteTotal + saasWasteTotal;
+
+  const categories = WASTE_CATEGORY_META.map(meta => {
+    const valueMap = { idleCompute, orphanedStorage, overProvisioned, unusedLicenses, duplicateTools, autoRenewed, shadowIT };
+    const value = valueMap[meta.key];
+    return Object.assign({}, meta, { value: value, pct: (value / totalWaste) * 100 });
+  }).sort((a, b) => b.value - a.value);
+
+  const contractsAtRisk = Math.round(clamp(inputs.saasTools * 0.12 * sizeMult, 3, 40));
+  const cloudEfficiencyScore = Math.round((1 - cloudWastePct) * 100);
+
+  // --- Resource split (Cloud Breakdown stacked bar) ---
+  const usefulSpend = inputs.cloudSpend - cloudWasteTotal;
+  const resourceSplit = {
+    Compute: usefulSpend * 0.40,
+    Storage: usefulSpend * 0.20,
+    Network: usefulSpend * 0.15,
+    Database: usefulSpend * 0.25,
+    Waste: cloudWasteTotal
+  };
+
+  // --- Waterfall steps ---
+  const waterfall = [
+    { label: 'Current Spend', value: inputs.cloudSpend },
+    { label: 'Idle Compute Savings', value: -idleCompute },
+    { label: 'Storage Cleanup', value: -orphanedStorage },
+    { label: 'Right-Sizing Savings', value: -overProvisioned },
+    { label: 'Optimized Spend', value: inputs.cloudSpend - cloudWasteTotal }
+  ];
+
+  // --- 12-month trend ---
+  const monthlySpend = [];
+  const monthlyWaste = [];
+  for (let i = 0; i < 12; i++) {
+    const base = inputs.cloudSpend / 12;
+    const spend = base * (1 + 0.05 * Math.sin((i / 12) * Math.PI * 2) + (i / 12) * 0.06);
+    const waste = spend * cloudWastePct * (1 - i * 0.01);
+    monthlySpend.push(spend);
+    monthlyWaste.push(waste);
+  }
+
+  // --- Services (bubble chart pool) ---
+  const totalTrackedSpend = inputs.cloudSpend + annualSaaSSpend;
+  const services = SERVICES.map(s => {
+    const cost = s.weight * totalTrackedSpend;
+    const wasted = cost * (1 - s.utilization / 100) * 0.5;
+    return Object.assign({}, s, { cost: cost, wasted: wasted });
+  });
+  const saasServices = services.filter(s => s.category === 'SaaS').sort((a, b) => b.wasted - a.wasted);
+
+  // --- Duplicate tool cards ---
+  const duplicateCards = DUPLICATE_GROUPS.map(g => {
+    const totalCost = duplicateTools * g.weight;
+    return Object.assign({}, g, { totalCost: totalCost, savings: totalCost * 0.6 });
+  });
+
+  // --- SaaS license status doughnut ---
+  const unusedStatusPct = Math.round(saasUnusedPct * 100 * 0.55);
+  const duplicateStatusPct = Math.round(saasUnusedPct * 100 * 0.25);
+  const underusedStatusPct = Math.round(saasUnusedPct * 100 * 0.20);
+  const activeStatusPct = 100 - unusedStatusPct - duplicateStatusPct - underusedStatusPct;
+
+  // --- Heatmap ---
+  const heatmap = DEPARTMENTS.map(dept => {
+    const deptLicenses = inputs.saasTools / DEPARTMENTS.length;
+    const cells = dept.profile.map((p, i) => ({
+      bucket: HEAT_BUCKETS[i],
+      pct: Math.round(p * 100),
+      count: Math.round(p * deptLicenses)
+    }));
+    return { name: dept.name, cells: cells };
+  });
+
+  // --- Contracts ---
+  const contractPool = annualSaaSSpend + inputs.cloudSpend * 0.25;
+  const avgContractValue = contractPool / CONTRACT_VENDORS.length;
+  const today = new Date();
+  const contracts = CONTRACT_VENDORS.map((c, idx) => {
+    const annualValue = c.weight * contractPool;
+    const renewalDate = new Date(today.getTime() + c.days * 24 * 60 * 60 * 1000);
+    let score = 0;
+    if (c.days <= 30) score += 2; else if (c.days <= 90) score += 1;
+    if (c.autoRenew) score += 1;
+    if (annualValue > avgContractValue * 1.5) score += 1;
+    const riskLevel = score >= 3 ? 'High' : score >= 1 ? 'Medium' : 'Low';
+    return {
+      id: idx,
+      vendor: c.vendor,
+      annualValue: annualValue,
+      daysUntilRenewal: c.days,
+      renewalDate: renewalDate,
+      autoRenew: c.autoRenew,
+      riskLevel: riskLevel
+    };
+  });
+  const nextAction = contracts.slice().sort((a, b) => {
+    const riskOrder = { High: 0, Medium: 1, Low: 2 };
+    if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+    return a.daysUntilRenewal - b.daysUntilRenewal;
+  })[0];
+
+  const topLeaks = categories.slice(0, 3).map(c => c.name);
+
+  return {
+    inputs, industryMult, sizeMult, providerFactor,
+    cloudWastePct, cloudWasteTotal, idleCompute, orphanedStorage, overProvisioned,
+    annualSaaSSpend, avgToolAnnualCost, saasUnusedPct, saasWasteTotal,
+    unusedLicenses, duplicateTools, autoRenewed, shadowIT,
+    totalWaste, categories, contractsAtRisk, cloudEfficiencyScore,
+    resourceSplit, waterfall, monthlySpend, monthlyWaste,
+    services, saasServices, duplicateCards,
+    saasStatus: { active: activeStatusPct, underused: underusedStatusPct, unused: unusedStatusPct, duplicate: duplicateStatusPct },
+    heatmap, contracts, nextAction, avgContractValue, topLeaks
+  };
+}
+
+/* ===================== RENDER: KPIs & ALERT ===================== */
+
+function updateKpis(model) {
+  document.getElementById('kpiTotalWaste').textContent = formatCompact(model.totalWaste);
+  document.getElementById('kpiCloudWastePct').textContent = (model.cloudWastePct * 100).toFixed(1) + '%';
+  document.getElementById('kpiUnusedLicenses').textContent = formatCompact(model.unusedLicenses);
+  document.getElementById('kpiContractsRisk').textContent = model.contractsAtRisk;
+
+  document.getElementById('miniIdleCompute').textContent = formatCompact(model.idleCompute);
+  document.getElementById('miniOrphanedStorage').textContent = formatCompact(model.orphanedStorage);
+  document.getElementById('miniRightSizing').textContent = formatCompact(model.overProvisioned);
+
+  const alertText = `Your estimated waste is ${formatCurrency(Math.round(model.totalWaste))}/year. The biggest leaks are ${model.topLeaks.join(', ')}.`;
+  document.getElementById('alertBannerText').textContent = alertText;
+}
+
+/* ===================== RENDER: TICKER ===================== */
+
+function buildTicker() {
+  const track = document.getElementById('tickerTrack');
+  const items = TICKER_FACTS.concat(TICKER_FACTS); // duplicate for seamless loop
+  track.innerHTML = items.map(f => `<span class="text-white/90 text-sm font-semibold px-8 whitespace-nowrap">${f}</span>`).join('');
+}
+
+/* ===================== RENDER: WASTE MAP TILES ===================== */
+
+function buildWasteTiles(model) {
+  const grid = document.getElementById('wasteTileGrid');
+  grid.innerHTML = '';
+  model.categories.forEach(cat => {
+    const tile = document.createElement('div');
+    const growBasis = Math.max(cat.pct, 6);
+    tile.className = 'waste-tile' + (appState.selectedCategoryKey === cat.key ? ' selected' : '');
+    tile.style.background = cat.color;
+    tile.style.flexGrow = growBasis;
+    tile.style.flexBasis = (growBasis * 6) + 'px';
+    tile.dataset.key = cat.key;
+    tile.innerHTML = `
+      <div class="font-bold text-sm leading-snug">${cat.name}</div>
+      <div>
+        <div class="text-xl font-extrabold">${formatCompact(cat.value)}</div>
+        <div class="text-xs opacity-90">${cat.pct.toFixed(1)}% of total waste</div>
+      </div>`;
+    grid.appendChild(tile);
+  });
+}
+
+function showWasteDetail(key) {
+  const model = appState.model;
+  const cat = model.categories.find(c => c.key === key);
+  if (!cat) return;
+  appState.selectedCategoryKey = key;
+  const panel = document.getElementById('wasteDetailPanel');
+  panel.style.borderColor = cat.color;
+  panel.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="text-lg font-extrabold" style="color:${cat.color}">${cat.name}</h4>
+      <span class="text-2xl font-extrabold">${formatCompact(cat.value)}<span class="text-sm text-gray-400 font-medium"> / year</span></span>
+    </div>
+    <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">Why it happens:</span> ${cat.why}</p>
+    <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">Recommendation:</span> ${cat.rec}</p>
+    <p class="text-sm font-semibold" style="color:${cat.color}">Estimated recoverable savings: ${formatCompact(cat.value * 0.6)}/year</p>
+  `;
+  // refresh tile highlight
+  document.querySelectorAll('.waste-tile').forEach(t => t.classList.toggle('selected', t.dataset.key === key));
+}
+
+/* ===================== RENDER: HEATMAP ===================== */
+
+function buildHeatmap(model) {
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = '';
+  const table = document.createElement('div');
+  table.className = 'grid text-xs';
+  table.style.gridTemplateColumns = '110px repeat(4, 1fr)';
+  table.style.gap = '6px';
+
+  // header row
+  table.appendChild(document.createElement('div'));
+  HEAT_BUCKETS.forEach(b => {
+    const h = document.createElement('div');
+    h.className = 'text-center font-bold text-gray-500';
+    h.textContent = b;
+    table.appendChild(h);
+  });
+
+  model.heatmap.forEach(dept => {
+    const label = document.createElement('div');
+    label.className = 'flex items-center font-bold text-gray-700 text-xs';
+    label.textContent = dept.name;
+    table.appendChild(label);
+    dept.cells.forEach((cell, i) => {
+      const el = document.createElement('div');
+      el.className = 'heat-cell';
+      el.style.background = HEAT_COLORS[i];
+      el.dataset.dept = dept.name;
+      el.dataset.bucket = cell.bucket;
+      el.dataset.pct = cell.pct;
+      el.dataset.count = cell.count;
+      el.innerHTML = `<div>${cell.pct}%</div><div class="text-[10px] font-normal opacity-70">${cell.count} lic.</div>`;
+      table.appendChild(el);
+    });
+  });
+  grid.appendChild(table);
+}
+
+function showHeatmapDetail(dept, bucket, pct, count) {
+  const box = document.getElementById('heatmapDetail');
+  const isLowUtil = bucket === '0-25%' || bucket === '25-50%';
+  box.innerHTML = `
+    <h4 class="text-lg font-extrabold mb-2">${dept} · ${bucket} utilization</h4>
+    <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">${count}</span> licenses (${pct}% of this department's tools) fall in this utilization band.</p>
+    <p class="text-sm text-gray-600">${isLowUtil
+      ? 'This is a low-utilization band — these licenses are strong candidates for downgrade or reclamation in the next access review.'
+      : 'This is a healthy utilization band — these licenses are actively used and lower priority for review.'}</p>
+  `;
+}
+
+/* ===================== RENDER: DUPLICATE CARDS ===================== */
+
+function buildDuplicateCards(model) {
+  const wrap = document.getElementById('duplicateCards');
+  wrap.innerHTML = '';
+  model.duplicateCards.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'card hover-lift p-4 border-l-4';
+    card.style.borderColor = '#FDCB6E';
+    card.innerHTML = `
+      <div class="font-bold text-sm mb-1">${g.category}</div>
+      <div class="text-xs text-gray-500 mb-2">${g.tools.join(' · ')}</div>
+      <div class="text-lg font-extrabold text-[#e0a800]">${formatCompact(g.totalCost)}</div>
+      <div class="text-xs text-gray-400 mb-2">combined annual cost</div>
+      <div class="text-xs text-gray-600 mb-2">Consolidate to a single vendor for ${g.category.toLowerCase()} and standardize rollout.</div>
+      <div class="text-xs font-semibold text-[#00A886]">Est. savings: ${formatCompact(g.savings)}/yr</div>
+    `;
+    wrap.appendChild(card);
+  });
+}
+
+/* ===================== RENDER: CONTRACTS ===================== */
+
+function riskBadgeHtml(risk) {
+  const cls = risk === 'High' ? 'badge-high' : risk === 'Medium' ? 'badge-medium' : 'badge-low';
+  return `<span class="badge ${cls}">${risk}</span>`;
+}
+
+function formatDate(d) {
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function buildContractCards(model) {
+  const wrap = document.getElementById('contractCards');
+  wrap.innerHTML = '';
+  model.contracts.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'contract-card p-4 hover-lift';
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="font-bold text-sm">${c.vendor}</div>
+        ${riskBadgeHtml(c.riskLevel)}
+      </div>
+      <div class="text-xl font-extrabold text-[#2d2d3a]">${formatCompact(c.annualValue)}</div>
+      <div class="text-xs text-gray-500 mt-1">Renews: ${formatDate(c.renewalDate)} (${c.daysUntilRenewal}d)</div>
+      <div class="text-xs text-gray-500">Auto-renew: <span class="font-semibold">${c.autoRenew ? 'Yes' : 'No'}</span></div>
+    `;
+    wrap.appendChild(card);
+  });
+
+  const na = model.nextAction;
+  const naCard = document.getElementById('nextActionCard');
+  naCard.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <div class="text-xs font-bold uppercase text-[#FF6B6B] tracking-wide">Next Action Required</div>
+        <div class="text-xl font-extrabold mt-1">${na.vendor} — ${formatCompact(na.annualValue)}/yr</div>
+        <div class="text-sm text-gray-600 mt-1">Renews in ${na.daysUntilRenewal} days (${formatDate(na.renewalDate)}), auto-renew is ${na.autoRenew ? 'ON' : 'off'}.</div>
+      </div>
+      ${riskBadgeHtml(na.riskLevel)}
+    </div>
+  `;
+}
+
+function renderContractTable(model) {
+  const tbody = document.getElementById('contractTableBody');
+  let rows = model.contracts.slice();
+  if (appState.sort.key) {
+    const key = appState.sort.key;
+    const dir = appState.sort.dir;
+    rows.sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (key === 'renewalDate') { av = av.getTime(); bv = bv.getTime(); }
+      if (key === 'autoRenew') { av = av ? 1 : 0; bv = bv ? 1 : 0; }
+      if (key === 'riskLevel') { const order = { High: 0, Medium: 1, Low: 2 }; av = order[av]; bv = order[bv]; }
+      if (typeof av === 'string') return av.localeCompare(bv) * dir;
+      return (av - bv) * dir;
+    });
+  }
+  tbody.innerHTML = rows.map(c => `
+    <tr class="border-b border-gray-50 hover:bg-gray-50">
+      <td class="py-2 pr-3 font-medium">${c.vendor}</td>
+      <td class="py-2 pr-3">${formatCompact(c.annualValue)}</td>
+      <td class="py-2 pr-3">${formatDate(c.renewalDate)}</td>
+      <td class="py-2 pr-3">${c.autoRenew ? 'Yes' : 'No'}</td>
+      <td class="py-2 pr-3">${riskBadgeHtml(c.riskLevel)}</td>
+      <td class="py-2 pr-3"><button class="reviewContractBtn text-[#6C5CE7] font-semibold hover:underline" data-id="${c.id}">Review</button></td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('#contractTable th.sortable .sort-arrow').forEach(a => a.textContent = '');
+  if (appState.sort.key) {
+    const th = document.querySelector(`#contractTable th[data-key="${appState.sort.key}"] .sort-arrow`);
+    if (th) th.textContent = appState.sort.dir === 1 ? '▲' : '▼';
+  }
+}
+
+function setupTableSort() {
+  document.querySelectorAll('#contractTable th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (appState.sort.key === key) {
+        appState.sort.dir *= -1;
+      } else {
+        appState.sort.key = key;
+        appState.sort.dir = 1;
+      }
+      renderContractTable(appState.model);
+    });
+  });
+}
+
+/* ===================== RENDER: CHARTS ===================== */
+
+function destroyChart(id) {
+  if (appState.charts[id]) {
+    appState.charts[id].destroy();
+    delete appState.charts[id];
+  }
+}
+
+const gaugeCenterTextPlugin = {
+  id: 'gaugeCenterText',
+  afterDraw: function() { /* label rendered via HTML overlay, kept as safe no-op hook */ }
+};
+
+function renderCharts(model) {
+  renderWasteDoughnut(model);
+  renderBubbleChart(model);
+  renderStackedBar(model);
+  renderGauge(model);
+  renderWaterfall(model);
+  renderTrend(model);
+  renderSaasBar(model);
+  renderSaasStatusDoughnut(model);
+  renderScatter(model);
+}
+
+function renderWasteDoughnut(model) {
+  destroyChart('wasteDoughnut');
+  const ctx = document.getElementById('chartWasteDoughnut');
+  appState.charts.wasteDoughnut = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: model.categories.map(c => c.name),
+      datasets: [{
+        data: model.categories.map(c => c.value),
+        backgroundColor: model.categories.map(c => c.color),
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+        datalabels: {
+          color: '#fff',
+          font: { weight: 'bold', size: 10 },
+          formatter: (v, ctx) => {
+            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            return ((v / total) * 100).toFixed(0) + '%';
+          }
+        },
+        tooltip: { callbacks: { label: (c) => c.label + ': ' + formatCompact(c.parsed) } }
+      },
+      onClick: (evt, elements) => {
+        if (elements.length) {
+          const idx = elements[0].index;
+          showWasteDetail(model.categories[idx].key);
+        }
+      }
+    }
+  });
+}
+
+function renderBubbleChart(model) {
+  destroyChart('bubble');
+  const ctx = document.getElementById('chartBubble');
+  const maxCost = Math.max(...model.services.map(s => s.cost));
+  const datasetsByCategory = {};
+  model.services.forEach(s => {
+    if (!datasetsByCategory[s.category]) datasetsByCategory[s.category] = [];
+    datasetsByCategory[s.category].push({
+      x: s.utilization,
+      y: s.cost,
+      r: 6 + (s.cost / maxCost) * 22,
+      name: s.name,
+      wasted: s.wasted
+    });
+  });
+  const datasets = Object.keys(datasetsByCategory).map(cat => ({
+    label: cat,
+    data: datasetsByCategory[cat],
+    backgroundColor: CATEGORY_COLORS[cat] + 'cc',
+    borderColor: CATEGORY_COLORS[cat],
+    borderWidth: 1
+  }));
+  appState.charts.bubble = new Chart(ctx, {
+    type: 'bubble',
+    data: { datasets: datasets },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: 'Utilization %' }, min: 0, max: 100 },
+        y: { title: { display: true, text: 'Annual Cost ($)' }, ticks: { callback: v => formatCompact(v) } }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        datalabels: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const d = c.raw;
+              return `${d.name}: ${formatCompact(d.y)} @ ${d.x}% utilization`;
+            }
+          }
+        }
+      },
+      onClick: (evt, elements) => {
+        if (elements.length) {
+          const el = elements[0];
+          const point = datasets[el.datasetIndex].data[el.index];
+          showServiceDetail(point);
+        }
+      }
+    }
+  });
+}
+
+function showServiceDetail(point) {
+  appState.selectedServiceName = point.name;
+  const panel = document.getElementById('wasteDetailPanel');
+  panel.style.borderColor = '#4A90E2';
+  panel.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="text-lg font-extrabold text-[#4A90E2]">${point.name}</h4>
+      <span class="text-2xl font-extrabold">${formatCompact(point.y)}<span class="text-sm text-gray-400 font-medium"> / year</span></span>
+    </div>
+    <p class="text-sm text-gray-600 mb-1">Utilization: <span class="font-semibold">${point.x}%</span></p>
+    <p class="text-sm text-gray-600">Estimated wasted spend: <span class="font-semibold text-[#FF6B6B]">${formatCompact(point.wasted)}/year</span> based on unused capacity at current utilization.</p>
+  `;
+}
+
+function renderStackedBar(model) {
+  destroyChart('stackedBar');
+  const ctx = document.getElementById('chartStackedBar');
+  const rs = model.resourceSplit;
+  const labels = ['Compute', 'Storage', 'Network', 'Database', 'Waste'];
+  const colors = ['#6C5CE7', '#00D2A0', '#4A90E2', '#FDCB6E', '#FF6B6B'];
+  appState.charts.stackedBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Annual Cloud Spend'],
+      datasets: labels.map((l, i) => ({
+        label: l,
+        data: [rs[l]],
+        backgroundColor: colors[i]
+      }))
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: { x: { stacked: true, ticks: { callback: v => formatCompact(v) } }, y: { stacked: true } },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+        datalabels: { display: false },
+        tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + formatCompact(c.parsed.x) } }
+      }
+    }
+  });
+}
+
+function renderGauge(model) {
+  destroyChart('gauge');
+  const ctx = document.getElementById('chartGauge');
+  const score = model.cloudEfficiencyScore;
+  document.getElementById('gaugeScoreText').textContent = score;
+  appState.charts.gauge = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Efficiency', 'Gap'],
+      datasets: [{
+        data: [score, 100 - score],
+        backgroundColor: ['#00D2A0', '#eee6ff'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      circumference: 180,
+      rotation: 270,
+      cutout: '72%',
+      plugins: { legend: { display: false }, datalabels: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+}
+
+function renderWaterfall(model) {
+  destroyChart('waterfall');
+  const ctx = document.getElementById('chartWaterfall');
+  const steps = model.waterfall;
+  let running = 0;
+  const bases = [];
+  const deltas = [];
+  const colors = [];
+  steps.forEach((s, i) => {
+    if (i === 0 || i === steps.length - 1) {
+      bases.push(0);
+      deltas.push(s.value);
+      colors.push(i === 0 ? '#4A90E2' : '#00D2A0');
+    } else {
+      const start = running;
+      const end = running + s.value;
+      bases.push(Math.min(start, end));
+      deltas.push(Math.abs(s.value));
+      colors.push('#FF6B6B');
+      running = end;
+    }
+    if (i === 0) running = s.value;
+  });
+  appState.charts.waterfall = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: steps.map(s => s.label),
+      datasets: [
+        { label: 'base', data: bases, backgroundColor: 'rgba(0,0,0,0)', stack: 'wf', datalabels: { display: false } },
+        { label: 'value', data: deltas, backgroundColor: colors, stack: 'wf' }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => formatCompact(v) } } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: (ctx) => ctx.datasetIndex === 1,
+          color: '#2d2d3a',
+          anchor: 'end',
+          align: 'top',
+          font: { size: 10, weight: 'bold' },
+          formatter: (v, ctx) => formatCompact(steps[ctx.dataIndex].value)
+        },
+        tooltip: {
+          callbacks: {
+            label: (c) => c.datasetIndex === 1 ? formatCompact(steps[c.dataIndex].value) : ''
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderTrend(model) {
+  destroyChart('trend');
+  const ctx = document.getElementById('chartTrend');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  appState.charts.trend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Cloud Spend', data: model.monthlySpend, borderColor: '#4A90E2', backgroundColor: '#4A90E233', tension: 0.35, fill: true },
+        { label: 'Waste', data: model.monthlyWaste, borderColor: '#FF6B6B', backgroundColor: '#FF6B6B33', tension: 0.35, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { ticks: { callback: v => formatCompact(v) } } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: { display: false },
+        annotation: {
+          annotations: {
+            benchmarkLine: {
+              type: 'line',
+              yMin: model.inputs.cloudSpend / 12,
+              yMax: model.inputs.cloudSpend / 12,
+              borderColor: '#6C5CE7',
+              borderWidth: 2,
+              borderDash: [6, 6],
+              label: { display: true, content: 'Monthly Budget Line', position: 'end', backgroundColor: '#6C5CE7', font: { size: 9 } }
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderSaasBar(model) {
+  destroyChart('saasBar');
+  const ctx = document.getElementById('chartSaasBar');
+  const top10 = model.saasServices.slice(0, 10);
+  appState.charts.saasBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top10.map(s => s.name),
+      datasets: [{ label: 'Wasted Spend', data: top10.map(s => s.wasted), backgroundColor: '#FD79A8' }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: { x: { ticks: { callback: v => formatCompact(v) } } },
+      plugins: {
+        legend: { display: false },
+        datalabels: { anchor: 'end', align: 'right', color: '#2d2d3a', font: { size: 10, weight: 'bold' }, formatter: v => formatCompact(v) },
+        tooltip: { callbacks: { label: (c) => formatCompact(c.parsed.x) } }
+      }
+    }
+  });
+}
+
+function renderSaasStatusDoughnut(model) {
+  destroyChart('saasStatus');
+  const ctx = document.getElementById('chartSaasStatus');
+  const s = model.saasStatus;
+  appState.charts.saasStatus = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Active', 'Underused', 'Unused', 'Duplicate'],
+      datasets: [{ data: [s.active, s.underused, s.unused, s.duplicate], backgroundColor: ['#00D2A0', '#FDCB6E', '#FF6B6B', '#6C5CE7'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: v => v + '%' },
+        tooltip: { callbacks: { label: (c) => c.label + ': ' + c.parsed + '%' } }
+      }
+    }
+  });
+}
+
+function renderScatter(model) {
+  destroyChart('scatter');
+  const ctx = document.getElementById('chartScatter');
+  const maxVal = Math.max(...model.contracts.map(c => c.annualValue));
+  const riskColor = { High: '#FF6B6B', Medium: '#FDCB6E', Low: '#00D2A0' };
+  const byRisk = { High: [], Medium: [], Low: [] };
+  model.contracts.forEach(c => {
+    byRisk[c.riskLevel].push({ x: c.daysUntilRenewal, y: c.annualValue, r: 6 + (c.annualValue / maxVal) * 20, vendor: c.vendor });
+  });
+  appState.charts.scatter = new Chart(ctx, {
+    type: 'bubble',
+    data: {
+      datasets: Object.keys(byRisk).map(risk => ({
+        label: risk + ' risk',
+        data: byRisk[risk],
+        backgroundColor: riskColor[risk] + 'cc',
+        borderColor: riskColor[risk]
+      }))
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: 'Days Until Renewal' } },
+        y: { title: { display: true, text: 'Annual Value ($)' }, ticks: { callback: v => formatCompact(v) } }
+      },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.raw.vendor}: ${formatCompact(c.raw.y)} in ${c.raw.x}d` } }
+      }
+    }
+  });
+}
+
+/* ===================== RENDER: SAVINGS REPORT ===================== */
+
+function buildReportText(model) {
+  const m = model;
+  const lines = [];
+  lines.push('CLOUDCUT IQ — SAVINGS REPORT');
+  lines.push(`Industry: ${m.inputs.industry} | Company Size: ${m.inputs.companySize} | Provider: ${m.inputs.provider}`);
+  lines.push('');
+  lines.push('EXECUTIVE SUMMARY');
+  lines.push(`Based on ${formatCurrency(m.inputs.cloudSpend)} in annual cloud spend and ${m.inputs.saasTools} SaaS tools across ${m.inputs.employees.toLocaleString()} employees, CloudCut IQ estimates ${formatCurrency(Math.round(m.totalWaste))} in total annual waste (${(m.cloudWastePct * 100).toFixed(1)}% of cloud spend and ${(m.saasUnusedPct * 100).toFixed(1)}% of SaaS spend). The largest leaks are ${m.topLeaks.join(', ')}.`);
+  lines.push('');
+  lines.push('SAVINGS OPPORTUNITIES');
+  m.categories.forEach(c => {
+    lines.push(`- ${c.name}: ${formatCurrency(Math.round(c.value))}/year (${c.pct.toFixed(1)}% of total waste), recoverable ~${formatCurrency(Math.round(c.value * 0.6))}/year`);
+  });
+  lines.push('');
+  lines.push('TOP 5 RECOMMENDED ACTIONS');
+  const top5 = m.categories.slice(0, 5);
+  top5.forEach((c, i) => lines.push(`${i + 1}. ${c.rec}`));
+  lines.push('');
+  lines.push('90-DAY ROADMAP');
+  lines.push(`Day 0-30: Tag and inventory all idle compute and orphaned storage; freeze new SaaS purchases outside procurement.`);
+  lines.push(`Day 30-60: Right-size the top 20% of over-provisioned instances; run access reviews on the ${m.inputs.saasTools} SaaS tools in use.`);
+  lines.push(`Day 60-90: Consolidate duplicate tools by function; renegotiate the ${m.contractsAtRisk} contracts at renewal risk before auto-renew triggers.`);
+  lines.push('');
+  lines.push('TOTAL IMPACT');
+  lines.push(`Recoverable savings estimate: ${formatCurrency(Math.round(m.totalWaste * 0.6))}/year (60% of identified waste).`);
+  return lines.join('\n');
+}
+
+function updateReport(model) {
+  const container = document.getElementById('reportContainer');
+  const top5 = model.categories.slice(0, 5);
+  container.innerHTML = `
+    <div>
+      <h3 class="text-xl font-extrabold mb-2">Executive Summary</h3>
+      <p class="text-sm text-gray-600 leading-relaxed">Based on ${formatCurrency(model.inputs.cloudSpend)} in annual cloud spend and ${model.inputs.saasTools} SaaS tools across ${model.inputs.employees.toLocaleString()} employees, CloudCut IQ estimates <span class="font-bold text-[#6C5CE7]">${formatCurrency(Math.round(model.totalWaste))}</span> in total annual waste (${(model.cloudWastePct * 100).toFixed(1)}% of cloud spend, ${(model.saasUnusedPct * 100).toFixed(1)}% of SaaS spend). The largest leaks are <span class="font-semibold">${model.topLeaks.join(', ')}</span>.</p>
+    </div>
+    <div>
+      <h3 class="text-xl font-extrabold mb-2">Savings Opportunity Cards</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        ${model.categories.map(c => `
+          <div class="rounded-xl p-4 text-white" style="background:${c.color}">
+            <div class="font-bold text-sm">${c.name}</div>
+            <div class="text-lg font-extrabold">${formatCompact(c.value)}</div>
+            <div class="text-xs opacity-90">Recoverable: ${formatCompact(c.value * 0.6)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div>
+      <h3 class="text-xl font-extrabold mb-2">Top 5 Recommended Actions</h3>
+      <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+        ${top5.map(c => `<li>${c.rec}</li>`).join('')}
+      </ol>
+    </div>
+    <div>
+      <h3 class="text-xl font-extrabold mb-2">90-Day Roadmap</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+        <div class="rounded-xl p-4 bg-[#f3f0ff]"><div class="font-bold mb-1">Day 0-30</div>Tag and inventory idle compute and orphaned storage; freeze new SaaS purchases outside procurement.</div>
+        <div class="rounded-xl p-4 bg-[#f0fdf7]"><div class="font-bold mb-1">Day 30-60</div>Right-size the top 20% of over-provisioned instances; run access reviews on all ${model.inputs.saasTools} SaaS tools.</div>
+        <div class="rounded-xl p-4 bg-[#fff5f0]"><div class="font-bold mb-1">Day 60-90</div>Consolidate duplicate tools by function; renegotiate the ${model.contractsAtRisk} contracts at renewal risk.</div>
+      </div>
+    </div>
+    <div class="rounded-xl p-5 text-white font-bold text-center bg-gradient-to-r from-[#6C5CE7] to-[#00D2A0]">
+      Total recoverable impact: ${formatCurrency(Math.round(model.totalWaste * 0.6))} / year
+    </div>
+  `;
+}
+
+/* ===================== RENDER: SOCIAL CAROUSEL ===================== */
+
+function updateCarousel(model) {
+  document.getElementById('slide3Text').textContent = `Your #1 leak is costing you ${formatCompact(model.categories[0].value)}/year.`;
+  document.getElementById('slide4Text').textContent = `Right-sizing alone can recover ${formatCompact(model.overProvisioned * 0.6)}/year.`;
+  document.getElementById('slide5Text').textContent = `${model.contractsAtRisk} contracts are about to auto-renew without review.`;
+}
+
+/* ===================== TABS ===================== */
+
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      appState.activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+    });
+  });
+}
+
+/* ===================== COPY / EXPORT ===================== */
+
+function copyText(text, statusEl) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (statusEl) {
+      statusEl.textContent = 'Copied!';
+      setTimeout(() => { statusEl.textContent = ''; }, 1800);
+    }
+  }).catch(() => {
+    if (statusEl) statusEl.textContent = 'Copy failed — please select and copy manually.';
+  });
+}
+
+function exportTextFile(text, filename) {
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ===================== EVENT WIRING (set up once) ===================== */
+
+function setupEventListeners() {
+  ['inputCloudSpend', 'inputSaasTools', 'inputEmployees'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateSliderLabels);
+  });
+
+  document.getElementById('scanBtn').addEventListener('click', runScan);
+  document.getElementById('navExportBtn').addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="report"]').click();
+    exportReport();
+  });
+
+  // Waste tile clicks (event delegation)
+  document.getElementById('wasteTileGrid').addEventListener('click', (e) => {
+    const tile = e.target.closest('.waste-tile');
+    if (tile) showWasteDetail(tile.dataset.key);
+  });
+
+  // Heatmap cell clicks (event delegation)
+  document.getElementById('heatmapGrid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.heat-cell');
+    if (cell) {
+      document.querySelectorAll('.heat-cell').forEach(c => c.classList.remove('selected'));
+      cell.classList.add('selected');
+      showHeatmapDetail(cell.dataset.dept, cell.dataset.bucket, cell.dataset.pct, cell.dataset.count);
+    }
+  });
+
+  // Contract table review buttons (event delegation)
+  document.getElementById('contractTableBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('.reviewContractBtn');
+    if (btn) {
+      const id = Number(btn.dataset.id);
+      const contract = appState.model.contracts.find(c => c.id === id);
+      if (contract) {
+        document.querySelector('.tab-btn[data-tab="renewal"]').click();
+        document.getElementById('nextActionCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  });
+
+  setupTableSort();
+
+  // Report buttons
+  document.getElementById('copyReportBtn').addEventListener('click', () => {
+    const text = buildReportText(appState.model);
+    copyText(text, document.getElementById('reportCopyStatus'));
+  });
+  document.getElementById('exportReportBtn').addEventListener('click', exportReport);
+  document.getElementById('regenerateReportBtn').addEventListener('click', () => {
+    updateReport(appState.model);
+    document.getElementById('reportCopyStatus').textContent = 'Report regenerated.';
+    setTimeout(() => { document.getElementById('reportCopyStatus').textContent = ''; }, 1800);
+  });
+
+  // Python code copy buttons (event delegation)
+  document.querySelectorAll('.copy-code-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      copyText(target.textContent, null);
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
+  });
+
+  // Caption copy button
+  document.getElementById('copyCaptionBtn').addEventListener('click', () => {
+    copyText(document.getElementById('captionBox').textContent, null);
+    const btn = document.getElementById('copyCaptionBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
+
+function exportReport() {
+  const text = buildReportText(appState.model);
+  exportTextFile(text, 'cloudcut-iq-savings-report.txt');
+}
+
+/* ===================== SCAN / RECALCULATE ===================== */
+
+function runScan() {
+  readInputsFromForm();
+  const scanBtn = document.getElementById('scanBtn');
+  const scanText = document.getElementById('scanBtnText');
+  scanBtn.disabled = true;
+  scanText.innerHTML = '<span class="spinner"></span> Scanning...';
+
+  setTimeout(() => {
+    appState.model = calculateModel(appState.inputs);
+    appState.selectedCategoryKey = appState.model.categories[0].key;
+    appState.sort = { key: null, dir: 1 };
+
+    updateKpis(appState.model);
+    buildWasteTiles(appState.model);
+    showWasteDetail(appState.model.categories[0].key);
+    buildHeatmap(appState.model);
+    buildDuplicateCards(appState.model);
+    buildContractCards(appState.model);
+    renderContractTable(appState.model);
+    renderCharts(appState.model);
+    updateReport(appState.model);
+    updateCarousel(appState.model);
+
+    scanBtn.disabled = false;
+    scanText.textContent = '🔍 Scan My Stack';
+    document.getElementById('scanStatus').textContent = 'Last scanned just now.';
+  }, 800);
+}
+
+/* ===================== INIT ===================== */
+
+function init() {
+  buildTicker();
+  updateSliderLabels();
+  setupTabs();
+  setupEventListeners();
+  Prism.highlightAll();
+  runScan();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<!--
+LINKEDIN CAPTION:
+
+Enterprises spent $2.59T on AI in 2026.
+95% cannot measure the ROI.
+The average enterprise runs 700+ AI tools.
+Most have no idea which ones are working.
+
+I built an interactive command center that:
+📊 Maps your entire AI tool portfolio by ROI vs. Adoption
+💰 Calculates actual ROI with a 5-step framework
+✂️ Identifies tool sprawl and consolidation savings
+🔥 Measures AI fatigue risk across your team
+📋 Auto-generates a board-ready executive report
+
+All of it — live in your browser. No backend. No API key.
+
+Try it here: [link]
+
+What's your company's AI tool count? Drop it below 👇
+
+#AI #EnterpriseAI #AIROI #DataAnalytics #FutureOfWork #ArtificialIntelligence
+#Analytics #TechStrategy #BusinessAnalytics #ProductManagement
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AISpend IQ — Enterprise AI ROI &amp; Tool Sprawl Command Center</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --bg:#080b14; --panel:#0f1623; --card:#141b2d; --border:#1e2a3a;
+  --text:#f8fafc; --text-dim:#94a3b8;
+  --indigo:#6366f1; --green:#10b981; --amber:#f59e0b; --red:#ef4444;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{ background:var(--bg); color:var(--text); font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+button{ font-family:inherit; cursor:pointer; }
+input[type=range]{ accent-color:var(--indigo); width:100%; }
+select, input[type=number]{ font-family:inherit; }
+
+.glow-text{ text-shadow:0 0 18px rgba(99,102,241,0.65); }
+.card{ background:var(--card); border:1px solid var(--border); border-radius:14px; }
+.panel{ background:var(--panel); border:1px solid var(--border); border-radius:14px; }
+
+/* ---- ticker ---- */
+.ticker-wrap{ background:#0b0f1a; border-bottom:1px solid var(--border); padding:8px 16px; text-align:center; font-size:0.8rem; color:var(--text-dim); }
+.ticker-msg{ transition:opacity .4s ease; }
+
+/* ---- tabs ---- */
+.tab-btn{ background:var(--card); border:1px solid var(--border); color:var(--text-dim); padding:10px 18px; border-radius:10px 10px 0 0; font-weight:600; font-size:0.88rem; transition:all .15s; }
+.tab-btn.active{ background:var(--indigo); color:#fff; border-color:var(--indigo); }
+.tab-btn:hover:not(.active){ color:var(--text); border-color:var(--indigo); }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+
+/* ---- stat cards ---- */
+.stat-card{ padding:16px; }
+.stat-label{ font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+.stat-value{ font-size:1.7rem; font-weight:800; }
+
+/* ---- urgency banner ---- */
+.urgency-banner{ background:rgba(239,68,68,0.12); border:1px solid var(--red); color:#fecaca; border-radius:10px; padding:12px 16px; font-size:0.88rem; font-weight:600; }
+
+/* ---- floating waste card ---- */
+.floating-waste{ position:fixed; right:16px; bottom:16px; z-index:60; width:230px; box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+.floating-waste .amount{ font-size:1.5rem; font-weight:800; color:var(--green); }
+
+/* ---- badges ---- */
+.badge{ display:inline-block; font-size:0.68rem; font-weight:700; padding:3px 10px; border-radius:999px; }
+.badge-keep{ background:rgba(16,185,129,0.15); color:var(--green); }
+.badge-optimize{ background:rgba(245,158,11,0.15); color:var(--amber); }
+.badge-eliminate{ background:rgba(239,68,68,0.15); color:var(--red); }
+.risk-critical{ background:rgba(239,68,68,0.15); color:var(--red); }
+.risk-medium{ background:rgba(245,158,11,0.15); color:var(--amber); }
+.risk-low{ background:rgba(16,185,129,0.15); color:var(--green); }
+
+/* ---- table ---- */
+table.data-table{ width:100%; border-collapse:collapse; font-size:0.82rem; }
+table.data-table th, table.data-table td{ padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; }
+table.data-table th{ color:var(--text-dim); font-weight:600; cursor:pointer; user-select:none; }
+table.data-table th:hover{ color:var(--indigo); }
+table.data-table tbody tr:hover{ background:rgba(99,102,241,0.06); }
+
+/* ---- modal ---- */
+.modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.65); display:none; align-items:center; justify-content:center; z-index:100; padding:16px; }
+.modal-overlay.open{ display:flex; }
+.modal-box{ background:var(--panel); border:1px solid var(--border); border-radius:16px; max-width:560px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; }
+.modal-close{ float:right; background:none; border:none; color:var(--text-dim); font-size:1.2rem; }
+
+/* ---- overlap cards ---- */
+.overlap-card{ cursor:pointer; transition:border-color .15s; }
+.overlap-card:hover{ border-color:var(--indigo); }
+.overlap-detail{ display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); font-size:0.82rem; color:var(--text-dim); }
+.overlap-detail.open{ display:block; }
+
+/* ---- gauge ---- */
+.gauge-wrap{ position:relative; max-width:260px; margin:0 auto; }
+.gauge-center{ position:absolute; left:0; right:0; top:58%; text-align:center; }
+.gauge-center .val{ font-size:1.7rem; font-weight:800; }
+.gauge-center .lbl{ font-size:0.7rem; color:var(--text-dim); }
+
+/* ---- hero stat-card mini visuals (non-technical-friendly at-a-glance graphics) ---- */
+.mini-visual{ margin:12px 0 6px; }
+.split-track{ background:#0b0f1a; border-radius:6px; height:14px; overflow:hidden; display:flex; }
+.split-seg-waste{ background:var(--red); height:100%; transition:width .5s ease; }
+.split-seg-working{ background:var(--green); height:100%; transition:width .5s ease; }
+.split-labels{ display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-dim); margin-top:4px; }
+.zone-track{ position:relative; height:14px; border-radius:6px;
+  background:linear-gradient(to right, var(--green) 0%, var(--green) 30%, var(--amber) 30%, var(--amber) 60%, var(--red) 60%, var(--red) 100%); }
+.zone-marker{ position:absolute; top:-4px; width:3px; height:22px; background:#fff; border-radius:2px; box-shadow:0 0 6px rgba(255,255,255,0.8); transition:left .5s ease; }
+.mini-ring-wrap{ position:relative; width:84px; height:84px; margin:8px auto 4px; }
+.mini-ring-center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.95rem; }
+.stat-caption{ font-size:0.72rem; color:var(--text-dim); margin-top:10px; font-style:italic; line-height:1.4; }
+
+/* ---- benchmark bars ---- */
+.bench-row{ margin-bottom:14px; }
+.bench-labels{ display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); margin-bottom:4px; }
+.bench-track{ background:#0b0f1a; border-radius:6px; height:10px; overflow:hidden; position:relative; }
+.bench-fill-you{ height:100%; position:absolute; left:0; top:0; border-radius:6px; background:var(--indigo); }
+.bench-mark-avg{ position:absolute; top:-3px; width:2px; height:16px; background:var(--text-dim); }
+
+/* ---- code blocks ---- */
+.code-block{ background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:20px; }
+.code-header{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--border); }
+.copy-btn{ background:var(--border); color:var(--text); border:none; padding:6px 12px; border-radius:6px; font-size:0.75rem; }
+.copy-btn.copied{ background:var(--green); color:#0f1623; }
+pre{ margin:0; padding:16px; overflow-x:auto; font-size:0.8rem; }
+pre[class*="language-"]{ background:#0b0f1a !important; }
+
+/* ---- carousel ---- */
+.slide{ border-radius:16px; padding:28px; min-height:250px; display:flex; flex-direction:column; justify-content:center; gap:10px; border:1px solid var(--border); }
+.slide h3{ margin:0; font-size:1.2rem; line-height:1.35; }
+.slide p{ margin:0; font-size:0.85rem; color:#e2e8f0; }
+.slide-num{ font-size:0.68rem; color:rgba(255,255,255,0.6); letter-spacing:1px; }
+
+/* ---- range slider label chip ---- */
+.range-val{ font-weight:700; color:var(--indigo); }
+
+@media (max-width: 900px){
+  .floating-waste{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<div class="sticky top-0 z-50 backdrop-blur bg-[#080b14]/90 border-b" style="border-color:var(--border);">
+  <div class="max-w-7xl mx-auto flex items-center justify-between px-6 py-3 flex-wrap gap-2">
+    <div class="text-lg font-extrabold glow-text">🧠 AISpend IQ</div>
+    <div class="text-xs font-mono text-slate-400 hidden md:block">Enterprise AI ROI &amp; Tool Sprawl Command Center</div>
+    <div class="flex gap-2">
+      <a href="#" onclick="return false;" class="text-xs border rounded-lg px-3 py-2" style="border-color:var(--border);">⭐ GitHub</a>
+      <a href="#" onclick="return false;" class="text-xs border rounded-lg px-3 py-2" style="border-color:var(--border);">View Portfolio</a>
+    </div>
+  </div>
+</div>
+<div class="ticker-wrap"><span class="ticker-msg" id="tickerMsg">Enterprises spent $2.59T on AI in 2026</span></div>
+
+<div class="max-w-7xl mx-auto px-6 pb-24">
+
+<!-- ============ HERO ============ -->
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-8">
+  <!-- LEFT: configurator -->
+  <div class="lg:col-span-2 card p-5">
+    <h2 class="font-bold text-lg mb-1">Configure Your Enterprise Profile</h2>
+    <p class="text-xs text-slate-400 mb-4">Every number on this page is driven by these inputs.</p>
+
+    <label class="text-xs text-slate-400">Industry</label>
+    <select id="inIndustry" class="w-full mb-3 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <option>Tech</option><option>Financial Services</option><option>Healthcare</option><option>Retail</option><option>Manufacturing</option>
+    </select>
+
+    <label class="text-xs text-slate-400">Company Size</label>
+    <select id="inSize" class="w-full mb-3 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <option>1K-5K</option><option selected>5K-20K</option><option>20K-100K</option><option>100K+</option>
+    </select>
+
+    <label class="text-xs text-slate-400">Region</label>
+    <select id="inRegion" class="w-full mb-3 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <option>North America</option><option>Europe</option><option>APAC</option>
+    </select>
+
+    <label class="text-xs text-slate-400">Primary Department</label>
+    <select id="inDept" class="w-full mb-4 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <option>Engineering</option><option>Sales &amp; Marketing</option><option>Operations</option><option>Finance</option><option>HR</option>
+    </select>
+
+    <label class="text-xs text-slate-400">Annual AI Budget: <span class="range-val" id="budgetLabel">$2.50M</span></label>
+    <input type="range" id="inBudget" min="100000" max="50000000" step="50000" value="2500000" class="mb-4">
+
+    <label class="text-xs text-slate-400">Number of AI Tools in Use: <span class="range-val" id="toolCountLabel">150</span></label>
+    <input type="range" id="inToolCount" min="10" max="1000" step="10" value="150" class="mb-5">
+
+    <button id="analyzeBtn" class="w-full text-white font-bold py-3 rounded-xl text-sm" style="background:var(--indigo);">🚀 Analyze My AI Stack</button>
+    <div id="loadingRow" class="hidden text-xs text-slate-400 mt-2 text-center">⏳ Crunching your AI stack…</div>
+  </div>
+
+  <!-- RIGHT: stat cards -->
+  <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="card stat-card">
+      <div class="stat-label">Estimated Annual AI Waste</div>
+      <div class="stat-value" id="statWaste" style="color:var(--red);">$0</div>
+      <div class="mini-visual">
+        <div class="split-track"><div class="split-seg-waste" id="wasteSegWaste" style="width:0%"></div><div class="split-seg-working" id="wasteSegWorking" style="width:100%"></div></div>
+        <div class="split-labels"><span>🔴 Wasted</span><span>🟢 Working</span></div>
+      </div>
+      <div class="stat-caption" id="wasteCaption"></div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Measurable ROI Coverage</div>
+      <div class="stat-value" id="statRoiCoverage">0%</div>
+      <div class="mini-ring-wrap"><canvas id="roiCoverageRing"></canvas><div class="mini-ring-center" id="roiRingCenter">0%</div></div>
+      <div class="stat-caption" id="roiCoverageCaption"></div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">AI Fatigue Score</div>
+      <div class="stat-value" id="statFatigue" style="color:var(--amber);">0.0 / 10</div>
+      <div class="mini-visual">
+        <div class="zone-track"><div class="zone-marker" id="fatigueMarker" style="left:0%;"></div></div>
+      </div>
+      <div class="stat-caption" id="fatigueCaptionHero"></div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Tools at Risk</div>
+      <div class="stat-value" id="statToolsAtRisk">0</div>
+      <div class="mini-ring-wrap"><canvas id="toolsAtRiskRing"></canvas><div class="mini-ring-center" id="toolsRiskRingCenter">0</div></div>
+      <div class="stat-caption" id="toolsAtRiskCaption"></div>
+    </div>
+    <div class="sm:col-span-2 urgency-banner" id="urgencyBanner">⚠️ Configure your profile and click Analyze to see your waste estimate.</div>
+  </div>
+</div>
+
+<!-- ============ CONTENT TABS ============ -->
+<div class="flex gap-2 flex-wrap mt-10">
+  <button class="tab-btn active" data-tab="toolmap">🗺️ Tool Map</button>
+  <button class="tab-btn" data-tab="roi">📊 ROI Calculator</button>
+  <button class="tab-btn" data-tab="consolidation">✂️ Consolidation Advisor</button>
+  <button class="tab-btn" data-tab="board">📋 Board Report</button>
+  <button class="tab-btn" data-tab="python">🐍 Python Model</button>
+  <button class="tab-btn" data-tab="carousel">📱 Carousel Slides</button>
+</div>
+
+<!-- ============ TAB: TOOL MAP ============ -->
+<div class="tab-panel active panel p-5 mt-0 rounded-t-none" id="tab-toolmap">
+  <h2 class="font-bold text-lg">AI Tool Portfolio — ROI vs. Adoption Matrix</h2>
+  <p class="text-xs text-slate-400 mb-4">Bubble size = annual spend. Color = recommendation. Click a bubble for the full profile. Chart rescales when you change Industry above.</p>
+  <div class="card p-4">
+    <canvas id="bubbleChart" height="110"></canvas>
+  </div>
+  <div class="flex gap-4 text-xs mt-3 text-slate-400">
+    <span>🟢 Green = Keep</span><span>🟡 Yellow = Optimize</span><span>🔴 Red = Eliminate</span>
+  </div>
+
+  <div class="card p-4 mt-6 overflow-x-auto">
+    <table class="data-table" id="toolTable">
+      <thead>
+        <tr>
+          <th data-key="name">Tool</th>
+          <th data-key="category">Category</th>
+          <th data-key="spend">Annual Cost</th>
+          <th data-key="adoption">Adoption</th>
+          <th data-key="roi">ROI Score</th>
+          <th data-key="status">Action</th>
+        </tr>
+      </thead>
+      <tbody id="toolTableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card p-4 mt-6" style="border-color:var(--indigo);">
+    <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">⚡ Quick-Win Finder</div>
+    <div id="quickWinText" class="font-semibold"></div>
+  </div>
+</div>
+
+<!-- ============ TAB: ROI CALCULATOR ============ -->
+<div class="tab-panel panel p-5 mt-0 rounded-t-none" id="tab-roi">
+  <h2 class="font-bold text-lg">AI ROI Calculator — From Vibe-Based Spending to P&amp;L Accountability</h2>
+  <p class="text-xs text-slate-400 mb-4">Every field below feeds the chart and results card live.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="card p-4">
+      <h3 class="font-semibold text-sm mb-3" style="color:var(--indigo);">Step 1 — Baseline</h3>
+      <label class="text-xs text-slate-400">Hours/week on manual tasks AI could automate</label>
+      <input type="number" id="r1_hours" value="12" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Average hourly employee cost ($)</label>
+      <input type="number" id="r1_rate" value="55" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Number of employees affected</label>
+      <input type="number" id="r1_employees" value="120" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Monthly ticket/task volume</label>
+      <input type="number" id="r1_tickets" value="4000" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Average error rate on manual tasks (%)</label>
+      <input type="number" id="r1_errRate" value="8" class="w-full mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+    </div>
+
+    <div class="card p-4">
+      <h3 class="font-semibold text-sm mb-3" style="color:var(--green);">Step 2 — AI Impact</h3>
+      <label class="text-xs text-slate-400">Estimated hours saved per week</label>
+      <input type="number" id="r2_hoursSaved" value="7.2" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Error rate reduction (%)</label>
+      <input type="number" id="r2_errReduction" value="40" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Task throughput increase (%)</label>
+      <input type="number" id="r2_throughput" value="18" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Customer satisfaction improvement (%)</label>
+      <input type="number" id="r2_csat" value="10" class="w-full mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <p class="text-xs text-slate-500 mt-2">Hours-saved and error-reduction fields auto-suggest at 60% and -40% of your Step 1 baseline — feel free to override.</p>
+    </div>
+
+    <div class="card p-4">
+      <h3 class="font-semibold text-sm mb-3" style="color:var(--amber);">Step 3 — AI Investment</h3>
+      <label class="text-xs text-slate-400">Monthly AI tool licensing cost ($)</label>
+      <input type="number" id="r3_licensing" value="9000" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Implementation cost ($, one-time)</label>
+      <input type="number" id="r3_implementation" value="35000" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Training cost per employee ($)</label>
+      <input type="number" id="r3_training" value="250" class="w-full mb-2 mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+      <label class="text-xs text-slate-400">Maintenance hours/month</label>
+      <input type="number" id="r3_maintenance" value="10" class="w-full mt-1 bg-[#0b0f1a] border rounded-lg p-2 text-sm" style="border-color:var(--border);">
+    </div>
+  </div>
+
+  <!-- Step 4 results -->
+  <div class="card p-5 mt-6">
+    <h3 class="font-semibold text-sm mb-4">Step 4 — Calculation Engine</h3>
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+      <div><div class="text-xs text-slate-400">Monthly Value</div><div class="font-bold" id="roiMonthlyValue">$0</div></div>
+      <div><div class="text-xs text-slate-400">Monthly Investment</div><div class="font-bold" id="roiMonthlyInvestment">$0</div></div>
+      <div><div class="text-xs text-slate-400">Monthly Net ROI</div><div class="font-bold" id="roiMonthlyNet">$0</div></div>
+      <div><div class="text-xs text-slate-400">Annual ROI %</div><div class="font-bold" id="roiAnnualPct">0%</div></div>
+      <div><div class="text-xs text-slate-400">Payback Period</div><div class="font-bold" id="roiPayback">–</div></div>
+      <div><div class="text-xs text-slate-400">Break-even Date</div><div class="font-bold" id="roiBreakeven">–</div></div>
+    </div>
+    <div class="text-center mt-4"><span class="badge" id="roiVerdictBadge" style="font-size:0.85rem;padding:6px 14px;">–</span></div>
+    <p class="text-xs text-slate-500 mt-3 text-center">Simplified estimation model — error-reduction and throughput/CSAT uplift are converted to dollars using your Step 1 hourly cost as a proxy, for illustration only.</p>
+  </div>
+
+  <!-- Step 5 chart -->
+  <div class="card p-4 mt-6">
+    <h3 class="font-semibold text-sm mb-2">Step 5 — ROI Projection (24 months)</h3>
+    <canvas id="roiChart" height="100"></canvas>
+    <div class="text-center text-sm mt-2" id="breakevenNote" style="color:var(--indigo);"></div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 text-xs">
+    <div class="card p-3 text-center">Finance AI: avg <b>8-month</b> payback</div>
+    <div class="card p-3 text-center">Manufacturing: <b>12–14 months</b></div>
+    <div class="card p-3 text-center">Customer Service: <b>6 months</b></div>
+    <div class="card p-3 text-center">Compliance: <b>10 months</b></div>
+  </div>
+</div>
+
+<!-- ============ TAB: CONSOLIDATION ADVISOR ============ -->
+<div class="tab-panel panel p-5 mt-0 rounded-t-none" id="tab-consolidation">
+  <h2 class="font-bold text-lg">✂️ AI Tool Consolidation — Stop Paying for Overlap</h2>
+
+  <h3 class="font-semibold text-sm mt-5 mb-2" style="color:var(--indigo);">A. Overlap Detection</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="overlapGrid"></div>
+
+  <h3 class="font-semibold text-sm mt-8 mb-2" style="color:var(--red);">B. Shadow AI Risk</h3>
+  <div class="card p-4 overflow-x-auto">
+    <table class="data-table">
+      <thead><tr><th>Tool</th><th>Risk Level</th><th>Data Exposure</th><th>Action Needed</th></tr></thead>
+      <tbody id="shadowTableBody"></tbody>
+    </table>
+  </div>
+
+  <h3 class="font-semibold text-sm mt-8 mb-2" style="color:var(--green);">C. Consolidation Impact Summary</h3>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="card stat-card"><div class="stat-label">Potential Annual Savings</div><div class="stat-value" id="consolSavings" style="color:var(--green);">$0</div></div>
+    <div class="card stat-card"><div class="stat-label">Shadow AI Tools to Address</div><div class="stat-value" id="consolShadowCount">0</div></div>
+    <div class="card stat-card"><div class="stat-label">Consolidation Complexity</div><div class="stat-value" id="consolComplexity">–</div></div>
+  </div>
+  <div class="mt-4">
+    <div class="bench-labels"><span>Sprawl Score</span><span id="sprawlScoreLabel">0 / 10</span></div>
+    <div class="bench-track" style="height:16px;"><div class="bench-fill-you" id="sprawlScoreBar" style="height:100%;"></div></div>
+  </div>
+</div>
+
+<!-- ============ TAB: BOARD REPORT ============ -->
+<div class="tab-panel panel p-5 mt-0 rounded-t-none" id="tab-board">
+  <h2 class="font-bold text-lg">📋 Board-Ready AI ROI Report — Auto-Generated</h2>
+  <div class="card p-5 mt-4" id="boardReportBody" style="line-height:1.7; font-size:0.9rem;"></div>
+  <div class="flex gap-3 mt-4 flex-wrap">
+    <button id="copyReportBtn" class="px-4 py-2 rounded-lg text-sm font-semibold" style="background:var(--indigo); color:#fff;">📋 Copy Report</button>
+    <button id="exportReportBtn" class="px-4 py-2 rounded-lg text-sm font-semibold border" style="border-color:var(--border);">📤 Export Report</button>
+    <button id="regenerateBtn" class="px-4 py-2 rounded-lg text-sm font-semibold border" style="border-color:var(--border);">🔄 Regenerate</button>
+  </div>
+</div>
+
+<!-- ============ TAB: PYTHON MODEL ============ -->
+<div class="tab-panel panel p-5 mt-0 rounded-t-none" id="tab-python">
+  <h2 class="font-bold text-lg mb-4">🐍 Python Model</h2>
+  <div id="codeBlocks"></div>
+</div>
+
+<!-- ============ TAB: CAROUSEL ============ -->
+<div class="tab-panel panel p-5 mt-0 rounded-t-none" id="tab-carousel">
+  <h2 class="font-bold text-lg mb-4">📱 Carousel Slides</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div class="slide" style="background:linear-gradient(160deg,#3f0f14,#080b14);">
+      <div class="slide-num">SLIDE 1 / 6</div>
+      <h3>Enterprises spent $2.59T on AI in 2026.<br>95% can't measure the ROI.<br>I built the tool that fixes this.<br>→ Swipe to see how</h3>
+    </div>
+    <div class="slide" style="background:linear-gradient(160deg,#141b2d,#080b14);">
+      <div class="slide-num">SLIDE 2 / 6</div>
+      <h3>Three crises hiding in your AI budget:</h3>
+      <p>1. ROI Blindness — 95% of spend unmeasured</p>
+      <p>2. Tool Sprawl — 700+ tools, zero visibility</p>
+      <p>3. AI Fatigue — 45% more burnout for heavy AI users</p>
+    </div>
+    <div class="slide" style="background:linear-gradient(160deg,#141b2d,#080b14);">
+      <div class="slide-num">SLIDE 3 / 6</div>
+      <h3>The ROI vs. Adoption Matrix</h3>
+      <div class="flex items-end gap-2 h-16 my-2">
+        <span style="width:26px;height:20px;border-radius:50%;background:var(--red);"></span>
+        <span style="width:38px;height:32px;border-radius:50%;background:var(--amber);"></span>
+        <span style="width:50px;height:50px;border-radius:50%;background:var(--green);"></span>
+        <span style="width:20px;height:16px;border-radius:50%;background:var(--red);"></span>
+      </div>
+      <p>Green = Keep · Yellow = Optimize · Red = Eliminate</p>
+      <p>Most enterprise AI stacks have 40–60% red zone tools</p>
+    </div>
+    <div class="slide" style="background:linear-gradient(160deg,#141b2d,#080b14);">
+      <div class="slide-num">SLIDE 4 / 6</div>
+      <h3>The formula CFOs want to see:</h3>
+      <p>Monthly Net ROI = Value Generated − Investment Cost</p>
+      <p>Break-even Month = Total Investment / Monthly Net ROI</p>
+      <p>Most teams never calculate this. Now you can.</p>
+    </div>
+    <div class="slide" style="background:linear-gradient(160deg,#141b2d,#080b14);">
+      <div class="slide-num">SLIDE 5 / 6</div>
+      <h3>90-Day AI Consolidation Plan — auto-generated</h3>
+      <p>Month 1: Eliminate redundant tools → Save $X</p>
+      <p>Month 2: Consolidate overlapping categories → Save $Y</p>
+      <p>Month 3: Address shadow AI risk → Avoid $Z in breach costs</p>
+    </div>
+    <div class="slide" style="background:linear-gradient(160deg,#1e1b4b,#080b14);">
+      <div class="slide-num">SLIDE 6 / 6</div>
+      <h3>Try AISpend IQ — free, in your browser</h3>
+      <p>🔗 [your-link-here]</p>
+      <p>Drop your AI tool count in the comments 👇</p>
+      <p>Bet it's higher than you think.</p>
+      <p style="color:var(--indigo);">#AI #EnterpriseAI #DataAnalytics #AIStrategy #ROI #TechLeadership</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /max-w-7xl -->
+
+<!-- ============ FLOATING WASTE CALCULATOR ============ -->
+<div class="floating-waste card p-4">
+  <div class="text-xs text-slate-400 mb-1">🔥 Live Waste Calculator</div>
+  <div class="text-xs text-slate-400">You could save:</div>
+  <div class="amount" id="floatingSaveAmount">$0</div>
+  <div class="text-xs text-slate-500">per year, updates as you adjust inputs</div>
+</div>
+
+<!-- ============ AI FATIGUE GAUGE + BENCHMARKS (shown under hero, own section) ============ -->
+<div class="max-w-7xl mx-auto px-6 mt-2 mb-16 grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="card p-5">
+    <h3 class="font-semibold text-sm mb-3">🔥 AI Fatigue Risk Meter</h3>
+    <div class="gauge-wrap">
+      <canvas id="fatigueGauge" height="150"></canvas>
+      <div class="gauge-center"><div class="val" id="gaugeVal">0.0</div><div class="lbl">out of 10</div></div>
+    </div>
+    <p class="text-xs text-slate-400 text-center mt-2" id="fatigueSubtext"></p>
+  </div>
+  <div class="card p-5">
+    <h3 class="font-semibold text-sm mb-4">📐 Industry Benchmark Comparison</h3>
+    <div id="benchmarkBars"></div>
+  </div>
+</div>
+
+<!-- ============ TOOL PROFILE MODAL ============ -->
+<div class="modal-overlay" id="toolModal">
+  <div class="modal-box">
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   AISPEND IQ — application logic
+   Everything runs entirely in the browser. All figures are simulated
+   (hard-coded or computed with simple formulas) to illustrate how an
+   enterprise AI ROI / sprawl dashboard would behave with real data.
+   ===================================================================== */
+
+/* ---------- 1. STATIC LOOKUP TABLES DRIVING THE PROFILE MATH ---------- */
+const INDUSTRY_FACTOR   = { 'Tech':0.9, 'Financial Services':1.0, 'Healthcare':1.1, 'Retail':1.05, 'Manufacturing':1.15 };
+const INDUSTRY_ROI_ADJ  = { 'Tech':0.3, 'Financial Services':0.1, 'Healthcare':-0.3, 'Retail':0.0, 'Manufacturing':-0.15 };
+const DEPT_ROI_FACTOR   = { 'Engineering':1.1, 'Sales & Marketing':0.9, 'Operations':1.0, 'Finance':1.2, 'HR':0.8 };
+const DEPT_FATIGUE_ADD  = { 'Engineering':0.8, 'Sales & Marketing':1.2, 'Operations':0.6, 'Finance':0.4, 'HR':0.5 };
+const SIZE_WASTE_ADD    = { '1K-5K':0, '5K-20K':0.03, '20K-100K':0.06, '100K+':0.1 };
+const REGION_WASTE_ADJ  = { 'North America':0, 'Europe':-0.03, 'APAC':0.04 };
+const INDUSTRY_AVG      = { wastePct:34, toolCount:700, roiCoverage:18, fatigue:6.4 };
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function fmtMoney(n){
+  if(Math.abs(n) >= 1e6) return '$'+(n/1e6).toFixed(2)+'M';
+  if(Math.abs(n) >= 1e3) return '$'+Math.round(n/1e3)+'K';
+  return '$'+Math.round(n).toLocaleString();
+}
+function fmtMoneyExact(n){ return '$'+Math.round(n).toLocaleString(); }
+
+/* ---------- 2. 20-TOOL CATALOG (simulated AI tool portfolio) ---------- */
+const TOOLS = [
+  { id:'t1',  name:'ChatGPT Enterprise',     category:'LLM/Chat',    adoption:92, roi:8.9, spend:480000, status:'keep',      fatigue:3.5, gov:{dpa:true,sec:true,policy:true},  evidence:'6,200 hrs/mo saved across support & content teams; $2.1M attributed cost avoidance.' },
+  { id:'t2',  name:'GitHub Copilot',         category:'Code',        adoption:88, roi:8.5, spend:210000, status:'keep',      fatigue:2.8, gov:{dpa:true,sec:true,policy:true},  evidence:'31% faster PR cycle time; engineering survey shows 4.6/5 satisfaction.' },
+  { id:'t3',  name:'Claude Enterprise',      category:'LLM/Chat',    adoption:81, roi:8.1, spend:300000, status:'keep',      fatigue:3.2, gov:{dpa:true,sec:true,policy:true},  evidence:'Primary tool for legal & compliance drafting; 40% faster contract review.' },
+  { id:'t4',  name:'Salesforce Einstein',    category:'Analytics',   adoption:74, roi:6.3, spend:320000, status:'optimize',  fatigue:4.5, gov:{dpa:true,sec:true,policy:false}, evidence:'Lead scoring accuracy up 12%; adoption uneven across regions.' },
+  { id:'t5',  name:'Cursor',                 category:'Code',        adoption:67, roi:7.4, spend:96000,  status:'keep',      fatigue:2.6, gov:{dpa:true,sec:true,policy:true},  evidence:'Growing fast among senior engineers; measurable velocity gains.' },
+  { id:'t6',  name:'Grammarly Business',     category:'Productivity',adoption:63, roi:5.9, spend:48000,  status:'optimize',  fatigue:2.1, gov:{dpa:true,sec:true,policy:true},  evidence:'Consistent usage but ROI hard to attribute to revenue.' },
+  { id:'t7',  name:'Gemini for Workspace',   category:'LLM/Chat',    adoption:58, roi:6.0, spend:240000, status:'optimize',  fatigue:3.9, gov:{dpa:true,sec:true,policy:true},  evidence:'Overlaps heavily with ChatGPT Enterprise; low incremental value.' },
+  { id:'t8',  name:'Notion AI',              category:'Productivity',adoption:51, roi:5.6, spend:54000,  status:'optimize',  fatigue:3.0, gov:{dpa:true,sec:false,policy:false},evidence:'Used mainly for meeting notes; limited workflow integration.' },
+  { id:'t9',  name:'Midjourney Pro',         category:'Image Gen',   adoption:46, roi:5.2, spend:60000,  status:'optimize',  fatigue:2.4, gov:{dpa:false,sec:false,policy:false},evidence:'Marketing team reports faster concepting; no revenue link yet.' },
+  { id:'t10', name:'Runway ML',              category:'Image Gen',  adoption:29, roi:5.4, spend:66000,  status:'optimize',  fatigue:2.7, gov:{dpa:false,sec:false,policy:false},evidence:'Niche use in brand video team; small user base.' },
+  { id:'t11', name:'Jasper AI',              category:'LLM/Chat',    adoption:22, roi:3.1, spend:90000,  status:'eliminate', fatigue:4.1, gov:{dpa:false,sec:false,policy:false},evidence:'Adoption declined 60% after ChatGPT Enterprise rollout.' },
+  { id:'t12', name:'Custom Internal Bot',    category:'Automation',  adoption:18, roi:2.4, spend:75000,  status:'eliminate', fatigue:5.0, gov:{dpa:false,sec:false,policy:false},evidence:'Built by a single team, no security review, unclear data handling.' },
+  { id:'t13', name:'Tool X',                 category:'Automation',  adoption:8,  roi:1.2, spend:45000,  status:'eliminate', fatigue:5.5, gov:{dpa:false,sec:false,policy:false},evidence:'Near-zero logins in the last 90 days.' },
+  { id:'t14', name:'Tool Y',                 category:'Analytics',   adoption:6,  roi:0.8, spend:38000,  status:'eliminate', fatigue:5.2, gov:{dpa:false,sec:false,policy:false},evidence:'Shelfware — purchased in 2024, never rolled out org-wide.' },
+  { id:'t15', name:'Tool Z',                 category:'Code',        adoption:5,  roi:1.0, spend:32000,  status:'eliminate', fatigue:4.8, gov:{dpa:false,sec:false,policy:false},evidence:'Duplicate of Copilot functionality, no unique use case.' },
+  { id:'t16', name:'Power BI Copilot',       category:'Analytics',   adoption:55, roi:6.1, spend:180000, status:'optimize',  fatigue:3.3, gov:{dpa:true,sec:true,policy:true},  evidence:'Overlaps with Tableau AI in the same org.' },
+  { id:'t17', name:'Tableau AI',             category:'Analytics',   adoption:48, roi:5.7, spend:165000, status:'optimize',  fatigue:3.4, gov:{dpa:true,sec:true,policy:false}, evidence:'Legacy analytics tool, migration to Power BI Copilot underway.' },
+  { id:'t18', name:'Zapier AI',              category:'Automation',  adoption:61, roi:6.6, spend:84000,  status:'keep',      fatigue:2.9, gov:{dpa:true,sec:true,policy:true},  evidence:'Backbone of 200+ internal workflow automations.' },
+  { id:'t19', name:'Make (Integromat)',      category:'Automation',  adoption:33, roi:4.8, spend:54000,  status:'optimize',  fatigue:3.1, gov:{dpa:true,sec:false,policy:false},evidence:'Redundant with Zapier AI in 70% of use cases.' },
+  { id:'t20', name:'DALL-E (via API)',       category:'Image Gen',   adoption:24, roi:4.0, spend:42000,  status:'optimize',  fatigue:2.5, gov:{dpa:true,sec:false,policy:false},evidence:'Used ad hoc by design team; overlaps with Midjourney Pro.' }
+];
+
+const STATUS_BADGE = { keep:'✅ Keep', optimize:'⚡ Optimize', eliminate:'🗑️ Eliminate' };
+const STATUS_CLASS = { keep:'badge-keep', optimize:'badge-optimize', eliminate:'badge-eliminate' };
+const STATUS_COLOR = { keep:'#10b981', optimize:'#f59e0b', eliminate:'#ef4444' };
+
+/* ---------- 3. CONSOLIDATION CATEGORY GROUPS ---------- */
+const OVERLAP_GROUPS = [
+  { label:'LLM/Chat',          toolIds:['t1','t3','t7','t11'],       effort:'Medium' },
+  { label:'Image Generation',  toolIds:['t9','t10','t20'],           effort:'Low' },
+  { label:'Code Assistance',   toolIds:['t2','t5','t15'],            effort:'Medium' },
+  { label:'Analytics',         toolIds:['t4','t16','t17','t14'],     effort:'High' },
+  { label:'Automation',        toolIds:['t18','t19','t12','t13'],    effort:'High' }
+];
+
+function toolById(id){ return TOOLS.find(t=>t.id===id); }
+function toolScore(t){ return t.adoption*0.6 + t.roi*10*0.4; } // composite ranking used to pick which tool to keep
+
+/* ---------- 4. SHADOW AI TABLE (simulated, independent of the 20-tool catalog) ---------- */
+const SHADOW_TOOLS = [
+  { name:'ChatGPT (personal accounts)',        risk:'Critical', exposure:'Confidential data pasted into free-tier accounts', action:'Block immediately' },
+  { name:'Grammarly (unmanaged extension)',    risk:'Medium',   exposure:'Org-wide browser install, no DPA on file',          action:'Request DPA' },
+  { name:'Otter.ai (meeting transcription)',   risk:'Medium',   exposure:'Auto-joins calls, unclear retention policy',       action:'Security review' },
+  { name:'Perplexity Pro (individual licenses)', risk:'Low',    exposure:'Low usage, public information only',              action:'Approve' },
+  { name:'Custom Internal Bot',                risk:'Critical', exposure:'No security review, built by a single team',      action:'Block immediately' },
+  { name:'Character.AI (personal use detected)', risk:'Critical', exposure:'Non-business tool, PII exposure risk',          action:'Block immediately' }
+];
+const RISK_CLASS = { Critical:'risk-critical', Medium:'risk-medium', Low:'risk-low' };
+const RISK_ICON = { Critical:'🔴', Medium:'🟡', Low:'🟢' };
+
+/* ---------- 5. APPLICATION STATE ---------- */
+const state = {
+  profile:{ industry:'Tech', size:'5K-20K', region:'North America', department:'Engineering', budget:2500000, toolCount:150 },
+  metrics:null,
+  toolSort:{ key:null, dir:1 },
+  reportJitter:1
+};
+
+/* ---------- 6. PROFILE METRICS ENGINE ---------- */
+function computeMetrics(p){
+  let wasteFraction = 0.15 + (p.toolCount-10)/990*0.35 + (SIZE_WASTE_ADD[p.size]||0) + (REGION_WASTE_ADJ[p.region]||0);
+  wasteFraction = clamp(wasteFraction, 0.1, 0.65) * (INDUSTRY_FACTOR[p.industry]||1);
+  wasteFraction = clamp(wasteFraction, 0.1, 0.7);
+  const annualWaste = p.budget * wasteFraction;
+
+  let roiCoverage = clamp(62 - (p.toolCount/1000)*50, 4, 62);
+  roiCoverage = clamp(roiCoverage * (DEPT_ROI_FACTOR[p.department]||1), 3, 75);
+
+  const fatigueScore = clamp(2 + (p.toolCount/1000)*6 + (DEPT_FATIGUE_ADD[p.department]||0.5), 0, 10);
+
+  const riskFraction = clamp(0.25 + (p.toolCount/1000)*0.2, 0.25, 0.5);
+  const toolsAtRisk = Math.round(p.toolCount * riskFraction);
+
+  const switchesPerDay = Math.round(4 + fatigueScore*1.5);
+  const minutesLostPerDay = Math.round(switchesPerDay * 4.2);
+  const percentileWorse = clamp(Math.round(50 + (wasteFraction-0.15)/0.4*45), 50, 96);
+
+  return { wasteFraction, annualWaste, roiCoverage, fatigueScore, toolsAtRisk, switchesPerDay, minutesLostPerDay, percentileWorse };
+}
+
+/* ---------- 7. LIVE FLOATING WASTE CALCULATOR (animated count-up) ---------- */
+let floatingCurrent = 0;
+function animateNumber(el, from, to, fmt, ms){
+  const start = performance.now();
+  function step(now){
+    const t = clamp((now-start)/ms, 0, 1);
+    const val = from + (to-from)*t;
+    el.textContent = fmt(val);
+    if(t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function updateFloatingWaste(){
+  const m = computeMetrics(state.profile);
+  const potentialSavings = m.annualWaste * 0.7; // assume ~70% of identified waste is recoverable via consolidation
+  const el = document.getElementById('floatingSaveAmount');
+  animateNumber(el, floatingCurrent, potentialSavings, fmtMoney, 500);
+  floatingCurrent = potentialSavings;
+}
+
+/* ---------- 8. READ PROFILE FROM CONTROLS ---------- */
+function readProfileFromDOM(){
+  state.profile.industry = document.getElementById('inIndustry').value;
+  state.profile.size = document.getElementById('inSize').value;
+  state.profile.region = document.getElementById('inRegion').value;
+  state.profile.department = document.getElementById('inDept').value;
+  state.profile.budget = parseInt(document.getElementById('inBudget').value, 10);
+  state.profile.toolCount = parseInt(document.getElementById('inToolCount').value, 10);
+  document.getElementById('budgetLabel').textContent = fmtMoney(state.profile.budget);
+  document.getElementById('toolCountLabel').textContent = state.profile.toolCount >= 1000 ? '1000+' : String(state.profile.toolCount);
+}
+
+/* ---------- 9. FULL ANALYSIS PASS (triggered by Analyze button) ---------- */
+function runFullAnalysis(){
+  const btn = document.getElementById('analyzeBtn');
+  const loadingRow = document.getElementById('loadingRow');
+  btn.disabled = true;
+  loadingRow.classList.remove('hidden');
+  setTimeout(()=>{
+    state.metrics = computeMetrics(state.profile);
+    renderHeroStats();
+    renderBubbleChart();
+    renderToolTable();
+    renderFatigueGauge();
+    renderBenchmarkBars();
+    renderQuickWin();
+    renderOverlapGrid();
+    renderShadowTable();
+    renderConsolidationSummary();
+    renderBoardReport();
+    loadingRow.classList.add('hidden');
+    btn.disabled = false;
+  }, 850);
+}
+
+function renderHeroStats(){
+  const m = state.metrics;
+  document.getElementById('statWaste').textContent = fmtMoney(m.annualWaste);
+  document.getElementById('statRoiCoverage').textContent = Math.round(m.roiCoverage)+'%';
+  document.getElementById('statFatigue').textContent = m.fatigueScore.toFixed(1)+' / 10';
+  document.getElementById('statToolsAtRisk').textContent = m.toolsAtRisk;
+  document.getElementById('urgencyBanner').textContent =
+    `⚠️ Your estimated AI waste: ${fmtMoney(m.annualWaste)}/year — larger than ${m.percentileWorse}% of companies your size`;
+
+  renderWasteVisual(m);
+  renderRoiCoverageRing(m);
+  renderFatigueHeroBar(m);
+  renderToolsAtRiskRing(m, state.profile);
+}
+
+/* ---------- 9b. HERO STAT-CARD MINI VISUALS (plain-language, non-technical-friendly) ---------- */
+let roiCoverageRingChart = null;
+let toolsAtRiskRingChart = null;
+
+function ringColorForPct(pct){
+  if(pct >= 50) return '#10b981';
+  if(pct >= 25) return '#f59e0b';
+  return '#ef4444';
+}
+
+function renderWasteVisual(m){
+  const wastePct = clamp(m.wasteFraction*100, 0, 100);
+  const workingPct = 100 - wastePct;
+  document.getElementById('wasteSegWaste').style.width = wastePct+'%';
+  document.getElementById('wasteSegWorking').style.width = workingPct+'%';
+  document.getElementById('wasteCaption').textContent =
+    `${Math.round(wastePct)}¢ of every AI dollar you spend isn't proven to deliver value.`;
+}
+
+function renderRoiCoverageRing(m){
+  const pct = clamp(m.roiCoverage, 0, 100);
+  const color = ringColorForPct(pct);
+  const ctx = document.getElementById('roiCoverageRing').getContext('2d');
+  const dataset = { data:[pct, 100-pct], backgroundColor:[color, '#1e2a3a'], borderWidth:0 };
+  if(roiCoverageRingChart){
+    roiCoverageRingChart.data.datasets[0] = dataset;
+    roiCoverageRingChart.update();
+  } else {
+    roiCoverageRingChart = new Chart(ctx, {
+      type:'doughnut',
+      data:{ datasets:[dataset] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'72%', plugins:{ legend:{ display:false }, tooltip:{ enabled:false } } }
+    });
+  }
+  const center = document.getElementById('roiRingCenter');
+  center.textContent = Math.round(pct)+'%';
+  center.style.color = color;
+  document.getElementById('roiCoverageCaption').textContent =
+    `You can prove ${Math.round(pct)}% of your AI spend is actually working — the rest is a guess.`;
+}
+
+function fatigueFace(score){
+  if(score <= 3) return '😌';
+  if(score <= 6) return '🙂';
+  return '😣';
+}
+function renderFatigueHeroBar(m){
+  const pct = clamp((m.fatigueScore/10)*100, 0, 100);
+  document.getElementById('fatigueMarker').style.left = pct+'%';
+  let sentence;
+  if(m.fatigueScore <= 3) sentence = 'Your team feels comfortable with its current AI tools.';
+  else if(m.fatigueScore <= 6) sentence = 'Your team feels moderately overwhelmed switching between AI tools.';
+  else sentence = 'Your team is at high risk of AI-driven burnout.';
+  document.getElementById('fatigueCaptionHero').textContent = `${fatigueFace(m.fatigueScore)} ${sentence}`;
+}
+
+function renderToolsAtRiskRing(m, p){
+  const total = Math.max(p.toolCount, 1);
+  const atRisk = m.toolsAtRisk;
+  const dataset = { data:[atRisk, Math.max(total-atRisk,0)], backgroundColor:['#ef4444','#1e2a3a'], borderWidth:0 };
+  const ctx = document.getElementById('toolsAtRiskRing').getContext('2d');
+  if(toolsAtRiskRingChart){
+    toolsAtRiskRingChart.data.datasets[0] = dataset;
+    toolsAtRiskRingChart.update();
+  } else {
+    toolsAtRiskRingChart = new Chart(ctx, {
+      type:'doughnut',
+      data:{ datasets:[dataset] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'72%', plugins:{ legend:{ display:false }, tooltip:{ enabled:false } } }
+    });
+  }
+  document.getElementById('toolsRiskRingCenter').textContent = atRisk+'/'+p.toolCount;
+  document.getElementById('toolsAtRiskCaption').textContent =
+    `${atRisk} of your ${p.toolCount} tools are flagged as risky, redundant, or barely used.`;
+}
+
+/* ---------- 10. TOOL MAP (bubble chart) ---------- */
+let bubbleChart = null;
+function scaledToolsForIndustry(industry){
+  const roiAdj = INDUSTRY_ROI_ADJ[industry] || 0;
+  const spendFactor = INDUSTRY_FACTOR[industry] || 1;
+  return TOOLS.map(t=>({
+    ...t,
+    roiAdjusted: clamp(t.roi + roiAdj, 0, 10),
+    spendAdjusted: Math.round(t.spend * spendFactor)
+  }));
+}
+function renderBubbleChart(){
+  const industry = state.profile.industry;
+  const data = scaledToolsForIndustry(industry);
+  const ctx = document.getElementById('bubbleChart').getContext('2d');
+  const dataset = {
+    label:'AI Tools',
+    data: data.map(t=>({ x:t.adoption, y:t.roiAdjusted, r: 6 + Math.sqrt(t.spendAdjusted)/80, _id:t.id })),
+    backgroundColor: data.map(t=>STATUS_COLOR[t.status]+'cc'),
+    borderColor: data.map(t=>STATUS_COLOR[t.status]),
+    borderWidth:1
+  };
+  if(bubbleChart){
+    bubbleChart.data.datasets[0] = dataset;
+    bubbleChart.update();
+    return;
+  }
+  bubbleChart = new Chart(ctx, {
+    type:'bubble',
+    data:{ datasets:[dataset] },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label:(c)=>{
+          const t = toolById(c.raw._id);
+          return `${t.name} — Adoption ${t.adoption}%, ROI ${t.roi}/10`;
+        } } }
+      },
+      scales:{
+        x:{ title:{ display:true, text:'Adoption Rate (%)', color:'#94a3b8' }, min:0, max:100, ticks:{ color:'#94a3b8' }, grid:{ color:'#1e2a3a' } },
+        y:{ title:{ display:true, text:'Measured ROI Score', color:'#94a3b8' }, min:0, max:10, ticks:{ color:'#94a3b8' }, grid:{ color:'#1e2a3a' } }
+      },
+      onClick:(evt, elements)=>{
+        if(!elements.length) return;
+        const idx = elements[0].index;
+        const id = bubbleChart.data.datasets[0].data[idx]._id;
+        openToolModal(id);
+      }
+    }
+  });
+}
+
+function openToolModal(id){
+  const t = toolById(id);
+  const businessOutcome = t.roi;
+  const adoptionScore = +(t.adoption/10).toFixed(1);
+  const govCount = (t.gov.dpa?1:0)+(t.gov.sec?1:0)+(t.gov.policy?1:0);
+  const govScore = +((govCount/3)*10).toFixed(1);
+  const migrationCost = Math.round(t.spend*0.15);
+  document.getElementById('modalBody').innerHTML = `
+    <h3 class="font-bold text-lg mb-1">${t.name}</h3>
+    <span class="badge ${STATUS_CLASS[t.status]}" style="font-size:0.8rem;">${STATUS_BADGE[t.status]}</span>
+    <div class="grid grid-cols-2 gap-3 mt-4 text-sm">
+      <div><span class="text-slate-400">Category:</span> ${t.category}</div>
+      <div><span class="text-slate-400">Annual License Cost:</span> ${fmtMoneyExact(t.spend)}</div>
+      <div><span class="text-slate-400">Adoption Rate:</span> ${t.adoption}%</div>
+      <div><span class="text-slate-400">ROI Score:</span> ${t.roi}/10</div>
+    </div>
+    <p class="text-sm text-slate-300 mt-3"><span class="text-slate-400">Measured ROI evidence:</span> ${t.evidence}</p>
+    <h4 class="font-semibold text-sm mt-4 mb-2">ROI Score Breakdown</h4>
+    <div class="text-sm space-y-1">
+      <div>Business Outcome Score: <b>${businessOutcome.toFixed(1)}/10</b></div>
+      <div>Adoption Score: <b>${adoptionScore.toFixed(1)}/10</b></div>
+      <div>Governance Score (DPA / Security Review / Policy): <b>${govScore.toFixed(1)}/10</b> ${t.gov.dpa?'✅ DPA':'❌ DPA'} ${t.gov.sec?'✅ Security Review':'❌ Security Review'} ${t.gov.policy?'✅ Policy Compliant':'❌ Policy Compliant'}</div>
+      <div>Fatigue Contribution Score: <b>${t.fatigue.toFixed(1)}/10</b></div>
+    </div>
+    <h4 class="font-semibold text-sm mt-4 mb-2">Recommended Action</h4>
+    <p class="text-sm text-slate-300">${recommendationText(t)}</p>
+    <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+      <div class="card p-3"><div class="text-slate-400 text-xs">Cost of Keeping</div><div class="font-bold">${fmtMoneyExact(t.spend)}/yr ongoing</div></div>
+      <div class="card p-3"><div class="text-slate-400 text-xs">Cost of Eliminating</div><div class="font-bold">${fmtMoneyExact(migrationCost)} one-time, then $0/yr</div></div>
+    </div>
+  `;
+  document.getElementById('toolModal').classList.add('open');
+}
+function recommendationText(t){
+  if(t.status==='keep') return `${t.name} shows strong adoption and measurable ROI — keep it as a core tool and consider expanding its rollout.`;
+  if(t.status==='optimize') return `${t.name} has partial adoption or unclear ROI attribution — tighten governance, measure outcomes for one more quarter, and consolidate with overlapping tools where possible.`;
+  return `${t.name} shows low adoption and weak ROI evidence — eliminate it and redirect the budget toward a tool that's already proven out.`;
+}
+document.getElementById('modalCloseBtn').addEventListener('click', ()=>document.getElementById('toolModal').classList.remove('open'));
+document.getElementById('toolModal').addEventListener('click', (e)=>{ if(e.target.id==='toolModal') e.currentTarget.classList.remove('open'); });
+
+/* ---------- 11. SORTABLE TOOL TABLE ---------- */
+function renderToolTable(){
+  const industry = state.profile.industry;
+  let rows = scaledToolsForIndustry(industry);
+  const { key, dir } = state.toolSort;
+  if(key){
+    const map = { name:'name', category:'category', spend:'spendAdjusted', adoption:'adoption', roi:'roiAdjusted', status:'status' };
+    const k = map[key];
+    rows = [...rows].sort((a,b)=>{
+      const av = a[k], bv = b[k];
+      if(typeof av === 'string') return av.localeCompare(bv)*dir;
+      return (av-bv)*dir;
+    });
+  }
+  document.getElementById('toolTableBody').innerHTML = rows.map(t=>`
+    <tr>
+      <td>${t.name}</td>
+      <td>${t.category}</td>
+      <td>${fmtMoneyExact(t.spendAdjusted)}</td>
+      <td>${t.adoption}%</td>
+      <td>${t.roiAdjusted.toFixed(1)}</td>
+      <td><span class="badge ${STATUS_CLASS[t.status]}">${STATUS_BADGE[t.status]}</span></td>
+    </tr>
+  `).join('');
+}
+document.querySelectorAll('#toolTable th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(state.toolSort.key === key) state.toolSort.dir *= -1;
+    else { state.toolSort.key = key; state.toolSort.dir = 1; }
+    renderToolTable();
+  });
+});
+
+/* ---------- 12. QUICK-WIN FINDER ---------- */
+function renderQuickWin(){
+  const industry = state.profile.industry;
+  const data = scaledToolsForIndustry(industry);
+  const eliminateTools = data.filter(t=>t.status==='eliminate').sort((a,b)=>b.spendAdjusted-a.spendAdjusted);
+  if(!eliminateTools.length){
+    document.getElementById('quickWinText').textContent = 'No clear zero-effort eliminations detected in the current portfolio.';
+    return;
+  }
+  const top = eliminateTools[0];
+  document.getElementById('quickWinText').textContent =
+    `⚡ Quick Win: Eliminating ${top.name} saves ${fmtMoney(top.spendAdjusted/12)}/month with minimal disruption — adoption is only ${top.adoption}%.`;
+}
+
+/* ---------- 13. AI FATIGUE GAUGE (Chart.js doughnut styled as a radial gauge) ---------- */
+let fatigueGaugeChart = null;
+const centerTextPlugin = {
+  id:'centerText',
+  afterDraw(){} // placeholder kept simple; center text is rendered via the HTML overlay instead
+};
+function fatigueZoneColor(score){
+  if(score <= 3) return '#10b981';
+  if(score <= 6) return '#f59e0b';
+  return '#ef4444';
+}
+function renderFatigueGauge(){
+  const m = state.metrics;
+  const score = m.fatigueScore;
+  const ctx = document.getElementById('fatigueGauge').getContext('2d');
+  const color = fatigueZoneColor(score);
+  const dataset = { data:[score, 10-score], backgroundColor:[color, '#1e2a3a'], borderWidth:0 };
+  if(fatigueGaugeChart){
+    fatigueGaugeChart.data.datasets[0] = dataset;
+    fatigueGaugeChart.update();
+  } else {
+    fatigueGaugeChart = new Chart(ctx, {
+      type:'doughnut',
+      data:{ datasets:[dataset] },
+      options:{
+        rotation:-90, circumference:180, cutout:'75%',
+        plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }
+      }
+    });
+  }
+  document.getElementById('gaugeVal').textContent = score.toFixed(1);
+  document.getElementById('gaugeVal').style.color = color;
+  document.getElementById('fatigueSubtext').textContent =
+    `Your team switches AI tools ${m.switchesPerDay} times per day on average. This adds ${m.minutesLostPerDay} minutes of productivity loss per employee per day.`;
+}
+
+/* ---------- 14. INDUSTRY BENCHMARK BARS ---------- */
+function benchmarkRow(label, youVal, avgVal, maxVal, fmt){
+  const youPct = clamp((youVal/maxVal)*100, 0, 100);
+  const avgPct = clamp((avgVal/maxVal)*100, 0, 100);
+  const worse = youVal > avgVal;
+  return `
+    <div class="bench-row">
+      <div class="bench-labels"><span>${label}</span><span>You: ${fmt(youVal)} · Industry avg: ${fmt(avgVal)}</span></div>
+      <div class="bench-track">
+        <div class="bench-fill-you" style="width:${youPct}%; background:${worse?'#ef4444':'#10b981'};"></div>
+        <div class="bench-mark-avg" style="left:${avgPct}%;"></div>
+      </div>
+    </div>
+  `;
+}
+function renderBenchmarkBars(){
+  const m = state.metrics;
+  const p = state.profile;
+  const wastePct = m.wasteFraction*100;
+  document.getElementById('benchmarkBars').innerHTML =
+    benchmarkRow('AI Waste %', wastePct, INDUSTRY_AVG.wastePct, 100, v=>Math.round(v)+'%') +
+    benchmarkRow('Tool Count', p.toolCount, INDUSTRY_AVG.toolCount, 1000, v=>Math.round(v)) +
+    benchmarkRow('ROI Coverage %', m.roiCoverage, INDUSTRY_AVG.roiCoverage, 100, v=>Math.round(v)+'%') +
+    benchmarkRow('Fatigue Score', m.fatigueScore, INDUSTRY_AVG.fatigue, 10, v=>v.toFixed(1));
+}
+
+/* ---------- 15. CONSOLIDATION ADVISOR ---------- */
+function overlapSavingsFor(group){
+  const tools = group.toolIds.map(toolById);
+  const sorted = [...tools].sort((a,b)=>toolScore(b)-toolScore(a));
+  const keep = sorted[0];
+  const eliminate = sorted.slice(1);
+  const totalCost = tools.reduce((s,t)=>s+t.spend,0);
+  const savings = eliminate.reduce((s,t)=>s+t.spend,0) * 0.9; // 90% recoverable after true-up/migration costs
+  return { tools, keep, eliminate, totalCost, savings };
+}
+function renderOverlapGrid(){
+  const grid = document.getElementById('overlapGrid');
+  grid.innerHTML = OVERLAP_GROUPS.map((g,i)=>{
+    const s = overlapSavingsFor(g);
+    return `
+      <div class="card p-4 overlap-card" data-idx="${i}">
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="font-semibold text-sm">${g.label}</div>
+            <div class="text-xs text-slate-400 mt-1">${g.toolIds.map(id=>toolById(id).name).join(', ')}</div>
+          </div>
+          <span class="badge badge-optimize">${g.toolIds.length} overlapping</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+          <div><span class="text-slate-400">Total category cost:</span> ${fmtMoneyExact(s.totalCost)}</div>
+          <div><span class="text-slate-400">Est. annual savings:</span> <b style="color:var(--green);">${fmtMoneyExact(s.savings)}</b></div>
+        </div>
+        <div class="overlap-detail" id="overlap-detail-${i}">
+          <div>✅ Keep: <b>${s.keep.name}</b> (highest ROI × adoption in this category)</div>
+          <div>🗑️ Eliminate: ${s.eliminate.map(t=>t.name).join(', ')}</div>
+          <div>Total savings from this consolidation: <b style="color:var(--green);">${fmtMoneyExact(s.savings)}</b></div>
+          <div>Migration effort: <b>${g.effort}</b></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  grid.querySelectorAll('.overlap-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      document.getElementById('overlap-detail-'+card.dataset.idx).classList.toggle('open');
+    });
+  });
+}
+function renderShadowTable(){
+  document.getElementById('shadowTableBody').innerHTML = SHADOW_TOOLS.map(s=>`
+    <tr>
+      <td>${s.name}</td>
+      <td><span class="badge ${RISK_CLASS[s.risk]}">${RISK_ICON[s.risk]} ${s.risk}</span></td>
+      <td>${s.exposure}</td>
+      <td>${s.action}</td>
+    </tr>
+  `).join('');
+}
+function renderConsolidationSummary(){
+  const totalSavings = OVERLAP_GROUPS.reduce((s,g)=>s+overlapSavingsFor(g).savings,0);
+  const shadowCount = SHADOW_TOOLS.filter(s=>s.action !== 'Approve').length;
+  const overlapToolCount = OVERLAP_GROUPS.reduce((s,g)=>s+g.toolIds.length,0);
+  const complexity = overlapToolCount >= 15 ? 'High' : overlapToolCount >= 8 ? 'Medium' : 'Low';
+  document.getElementById('consolSavings').textContent = fmtMoney(totalSavings);
+  document.getElementById('consolShadowCount').textContent = shadowCount;
+  document.getElementById('consolComplexity').textContent = complexity;
+
+  const sprawlScore = clamp(2 + (state.profile.toolCount/1000)*8, 0, 10);
+  document.getElementById('sprawlScoreLabel').textContent = sprawlScore.toFixed(1)+' / 10';
+  const bar = document.getElementById('sprawlScoreBar');
+  bar.style.width = (sprawlScore/10*100)+'%';
+  bar.style.background = sprawlScore > 7 ? '#ef4444' : sprawlScore >= 4 ? '#f59e0b' : '#10b981';
+}
+
+/* ---------- 16. ROI CALCULATOR (Tab 2) ---------- */
+const roiInputs = ['r1_hours','r1_rate','r1_employees','r1_tickets','r1_errRate','r2_hoursSaved','r2_errReduction','r2_throughput','r2_csat','r3_licensing','r3_implementation','r3_training','r3_maintenance'];
+
+function readRoiInputs(){
+  const v = {};
+  roiInputs.forEach(id=>{ v[id] = parseFloat(document.getElementById(id).value) || 0; });
+  return v;
+}
+function computeRoi(v){
+  const weeksPerMonth = 4.33;
+  const laborValue = v.r2_hoursSaved * weeksPerMonth * v.r1_rate * v.r1_employees;
+  const errorValue = v.r1_tickets * (v.r1_errRate/100) * (v.r2_errReduction/100) * (v.r1_rate*0.5);
+  const revenueUplift = (v.r2_throughput/100) * v.r1_tickets * (v.r1_rate*0.2) + (v.r2_csat/100) * (v.r1_employees * v.r1_rate*0.1);
+  const monthlyValue = laborValue + errorValue + revenueUplift;
+
+  const monthlyRecurring = v.r3_licensing + v.r3_maintenance*v.r1_rate;
+  const monthlyImplementationAmortized = v.r3_implementation/12;
+  const monthlyTrainingAmortized = (v.r3_training * v.r1_employees)/12;
+  const monthlyInvestment = monthlyRecurring + monthlyImplementationAmortized + monthlyTrainingAmortized;
+
+  const monthlyNet = monthlyValue - monthlyInvestment;
+  const annualInvestment = monthlyInvestment*12;
+  const annualNet = monthlyNet*12;
+  const roiPct = annualInvestment > 0 ? (annualNet/annualInvestment)*100 : 0;
+
+  const oneTimeCosts = v.r3_implementation + v.r3_training*v.r1_employees;
+  const monthlyNetExcludingAmortized = monthlyValue - monthlyRecurring;
+  const paybackMonths = monthlyNetExcludingAmortized > 0 ? oneTimeCosts/monthlyNetExcludingAmortized : Infinity;
+
+  return { monthlyValue, monthlyInvestment, monthlyRecurring, monthlyNet, roiPct, paybackMonths, oneTimeCosts, monthlyNetExcludingAmortized };
+}
+function roiVerdict(pct){
+  if(pct > 200) return { label:'🟢 Exceptional', cls:'badge-keep' };
+  if(pct >= 100) return { label:'🟢 Strong', cls:'badge-keep' };
+  if(pct >= 50) return { label:'🟡 Moderate', cls:'badge-optimize' };
+  if(pct >= 0) return { label:'🟠 Low', cls:'badge-optimize' };
+  return { label:'🔴 Negative ROI — Reconsider', cls:'badge-eliminate' };
+}
+let roiChart = null;
+function renderRoiCalculator(){
+  const v = readRoiInputs();
+  const r = computeRoi(v);
+
+  document.getElementById('roiMonthlyValue').textContent = fmtMoney(r.monthlyValue);
+  document.getElementById('roiMonthlyInvestment').textContent = fmtMoney(r.monthlyInvestment);
+  document.getElementById('roiMonthlyNet').textContent = fmtMoney(r.monthlyNet);
+  document.getElementById('roiAnnualPct').textContent = Math.round(r.roiPct)+'%';
+  document.getElementById('roiPayback').textContent = isFinite(r.paybackMonths) ? r.paybackMonths.toFixed(1)+' mo' : 'N/A';
+
+  let breakevenLabel = 'Not reached';
+  if(isFinite(r.paybackMonths)){
+    const d = new Date();
+    d.setMonth(d.getMonth() + Math.ceil(r.paybackMonths));
+    breakevenLabel = d.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+  }
+  document.getElementById('roiBreakeven').textContent = breakevenLabel;
+
+  const verdict = roiVerdict(r.roiPct);
+  const badge = document.getElementById('roiVerdictBadge');
+  badge.textContent = verdict.label;
+  badge.className = 'badge '+verdict.cls;
+
+  // 24-month projection
+  const months = Array.from({length:24}, (_,i)=>i+1);
+  const cumInvestment = months.map(mo => r.oneTimeCosts + r.monthlyRecurring*mo);
+  const cumValue = months.map(mo => r.monthlyValue*mo);
+
+  let breakevenMonth = null;
+  for(let i=0;i<months.length;i++){
+    if(cumValue[i] >= cumInvestment[i]){ breakevenMonth = months[i]; break; }
+  }
+  document.getElementById('breakevenNote').textContent = breakevenMonth
+    ? `📍 Break-even: Month ${breakevenMonth}`
+    : `📍 Break-even not reached within 24 months at current inputs`;
+
+  const netSeries = months.map((mo,i)=>cumValue[i]-cumInvestment[i]);
+
+  const ctx = document.getElementById('roiChart').getContext('2d');
+  const datasets = [
+    { label:'Cumulative Investment', data:cumInvestment, borderColor:'#ef4444', backgroundColor:'transparent', borderDash:[5,4], tension:0.25, pointRadius:0, order:1 },
+    { label:'Cumulative Value Generated', data:cumValue, borderColor:'#10b981', backgroundColor:'transparent', tension:0.25, pointRadius:0, order:1 },
+    { label:'Profit / Loss Zone', data:netSeries, fill:'origin', borderWidth:0, pointRadius:0, order:2,
+      segment:{
+        borderColor: ctx2 => ctx2.p0.parsed.y >= 0 ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)',
+        backgroundColor: ctx2 => ctx2.p0.parsed.y >= 0 ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'
+      }
+    }
+  ];
+  if(roiChart){
+    roiChart.data.labels = months;
+    roiChart.data.datasets = datasets;
+    roiChart.update();
+  } else {
+    roiChart = new Chart(ctx, {
+      type:'line',
+      data:{ labels:months, datasets },
+      options:{
+        responsive:true,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ labels:{ color:'#f8fafc' }, position:'bottom' } },
+        scales:{
+          x:{ title:{ display:true, text:'Month', color:'#94a3b8' }, ticks:{ color:'#94a3b8' }, grid:{ color:'#1e2a3a' } },
+          y:{ ticks:{ color:'#94a3b8', callback:v=>fmtMoney(v) }, grid:{ color:'#1e2a3a' } }
+        }
+      }
+    });
+  }
+}
+roiInputs.forEach(id=>document.getElementById(id).addEventListener('input', ()=>{
+  // keep the auto-suggest fields loosely in sync when the baseline changes
+  if(id === 'r1_hours'){
+    const hours = parseFloat(document.getElementById('r1_hours').value)||0;
+    document.getElementById('r2_hoursSaved').value = (hours*0.6).toFixed(1);
+  }
+  renderRoiCalculator();
+}));
+
+/* ---------- 17. BOARD REPORT ---------- */
+function renderBoardReport(){
+  const jitter = state.reportJitter;
+  const m = state.metrics || computeMetrics(state.profile);
+  const p = state.profile;
+  const keepTools = TOOLS.filter(t=>t.status==='keep');
+  const optimizeTools = TOOLS.filter(t=>t.status==='optimize');
+  const eliminateTools = TOOLS.filter(t=>t.status==='eliminate');
+  const keepCost = keepTools.reduce((s,t)=>s+t.spend,0)*jitter;
+  const optimizeCost = optimizeTools.reduce((s,t)=>s+t.spend,0)*jitter;
+  const eliminateCost = eliminateTools.reduce((s,t)=>s+t.spend,0)*jitter;
+  const totalSavings = OVERLAP_GROUPS.reduce((s,g)=>s+overlapSavingsFor(g).savings,0)*jitter;
+  const shadowCount = SHADOW_TOOLS.filter(s=>s.action!=='Approve').length;
+  const roiVals = computeRoi(readRoiInputs());
+  const quickWinTools = scaledToolsForIndustry(p.industry).filter(t=>t.status==='eliminate').sort((a,b)=>b.spendAdjusted-a.spendAdjusted);
+  const quickWin = quickWinTools[0];
+
+  document.getElementById('boardReportBody').innerHTML = `
+    <h3 class="font-bold mb-2">1. Executive Summary</h3>
+    <p class="text-slate-300 mb-4">${p.industry} · ${p.size} employees is currently running ${p.toolCount} AI tools at an annual investment of ${fmtMoney(p.budget)}. Measurable ROI covers ${Math.round(m.roiCoverage)}% of spend. Estimated annual waste: ${fmtMoney(m.annualWaste)}.</p>
+
+    <h3 class="font-bold mb-2">2. AI Portfolio Health</h3>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="card p-3 text-center"><div class="text-xs text-slate-400">Keep</div><div class="font-bold" style="color:var(--green);">${keepTools.length} tools · ${fmtMoney(keepCost)}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-slate-400">Optimize</div><div class="font-bold" style="color:var(--amber);">${optimizeTools.length} tools · ${fmtMoney(optimizeCost)}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-slate-400">Eliminate</div><div class="font-bold" style="color:var(--red);">${eliminateTools.length} tools · ${fmtMoney(eliminateCost)}</div></div>
+    </div>
+
+    <h3 class="font-bold mb-2">3. ROI Snapshot</h3>
+    <p class="text-slate-300 mb-4">Monthly Net ROI: ${fmtMoney(roiVals.monthlyNet)} · Annual ROI: ${Math.round(roiVals.roiPct)}% · Payback: ${isFinite(roiVals.paybackMonths)?roiVals.paybackMonths.toFixed(1)+' months':'N/A'}.</p>
+
+    <h3 class="font-bold mb-2">4. Top 3 Recommendations</h3>
+    <ol class="list-decimal list-inside text-slate-300 mb-4 space-y-1">
+      <li>Consolidate the ${OVERLAP_GROUPS[0].label} category (${OVERLAP_GROUPS[0].toolIds.length} overlapping tools) — most urgent consolidation opportunity.</li>
+      <li>${quickWin ? `Eliminate ${quickWin.name} for an immediate ${fmtMoney(quickWin.spendAdjusted)}/year saving with minimal disruption.` : 'Re-run the ROI calculator with updated inputs to surface the next highest-impact action.'}</li>
+      <li>Resolve ${shadowCount} shadow AI tools flagged for blocking, DPA, or security review before the next compliance audit.</li>
+    </ol>
+
+    <h3 class="font-bold mb-2">5. 90-Day Action Plan</h3>
+    <table class="data-table mb-2">
+      <thead><tr><th>Month</th><th>Action</th><th>Owner</th><th>Expected Outcome</th><th>KPI</th></tr></thead>
+      <tbody>
+        <tr><td>Month 1</td><td>Eliminate the 5 zero-adoption tools</td><td>IT Procurement + Security</td><td>${fmtMoney(eliminateCost)}/year saved immediately</td><td>Licenses cancelled: 5/5</td></tr>
+        <tr><td>Month 2</td><td>Consolidate overlapping LLM/Chat and Automation categories</td><td>CIO + Department Heads</td><td>${fmtMoney(totalSavings)}/year saved</td><td>Tool count reduced by ${OVERLAP_GROUPS.reduce((s,g)=>s+g.toolIds.length-1,0)}</td></tr>
+        <tr><td>Month 3</td><td>Remediate shadow AI risk (DPAs, security reviews, blocks)</td><td>CISO / Security Team</td><td>Data exposure risk reduced</td><td>% shadow tools resolved: target 100%</td></tr>
+      </tbody>
+    </table>
+  `;
+}
+function reportPlainText(){
+  return document.getElementById('boardReportBody').innerText;
+}
+document.getElementById('copyReportBtn').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(reportPlainText()).then(()=>{
+    const btn = document.getElementById('copyReportBtn');
+    const old = btn.textContent;
+    btn.textContent = '✅ Copied';
+    setTimeout(()=>btn.textContent = old, 1500);
+  });
+});
+document.getElementById('exportReportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([reportPlainText()], { type:'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'aispend-iq-board-report.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('regenerateBtn').addEventListener('click', ()=>{
+  state.reportJitter = 0.9 + Math.random()*0.2; // +/-10% jitter to simulate a refreshed pull of the numbers
+  renderBoardReport();
+});
+
+/* ---------- 18. WIRE UP PROFILE CONTROLS ---------- */
+['inIndustry','inSize','inRegion','inDept','inBudget','inToolCount'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=>{
+    readProfileFromDOM();
+    updateFloatingWaste();
+    if(state.metrics){
+      // keep everything in sync live once an initial analysis has run
+      state.metrics = computeMetrics(state.profile);
+      renderHeroStats();
+      renderBubbleChart();
+      renderToolTable();
+      renderFatigueGauge();
+      renderBenchmarkBars();
+      renderQuickWin();
+      renderConsolidationSummary();
+      renderBoardReport();
+    }
+  });
+});
+document.getElementById('analyzeBtn').addEventListener('click', ()=>{
+  readProfileFromDOM();
+  runFullAnalysis();
+});
+
+/* ---------- 19. TICKER ---------- */
+const TICKER_MESSAGES = [
+  'Enterprises spent $2.59T on AI in 2026',
+  '95% cannot measure ROI',
+  'Average enterprise runs 700+ AI tools'
+];
+let tickerIdx = 0;
+setInterval(()=>{
+  const el = document.getElementById('tickerMsg');
+  el.style.opacity = 0;
+  setTimeout(()=>{
+    tickerIdx = (tickerIdx+1) % TICKER_MESSAGES.length;
+    el.textContent = TICKER_MESSAGES[tickerIdx];
+    el.style.opacity = 1;
+  }, 400);
+}, 3600);
+
+/* ---------- 20. TAB SWITCHING ---------- */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- 21. PYTHON MODEL TAB ---------- */
+const CODE_SECTIONS = [
+  { title:'1. AI ROI Calculation Engine', code:
+`class AIRoiCalculator:
+    """Computes monthly value, investment, ROI %, and payback period."""
+
+    def __init__(self, hourly_rate, employees):
+        self.hourly_rate = hourly_rate
+        self.employees = employees
+
+    def monthly_value(self, hours_saved_per_week, error_reduction_pct,
+                       ticket_volume, baseline_error_rate_pct):
+        weeks_per_month = 4.33
+        labor_value = hours_saved_per_week * weeks_per_month * self.hourly_rate * self.employees
+        error_value = (ticket_volume * (baseline_error_rate_pct / 100)
+                       * (error_reduction_pct / 100) * (self.hourly_rate * 0.5))
+        return labor_value + error_value
+
+    def monthly_investment(self, licensing, implementation_cost, maintenance_hours):
+        return licensing + implementation_cost / 12 + maintenance_hours * self.hourly_rate
+
+    def payback_months(self, one_time_costs, monthly_net_recurring):
+        if monthly_net_recurring <= 0:
+            return float("inf")
+        return one_time_costs / monthly_net_recurring
+
+    def annual_roi_pct(self, monthly_net, monthly_investment):
+        annual_investment = monthly_investment * 12
+        if annual_investment <= 0:
+            return 0
+        return (monthly_net * 12 / annual_investment) * 100` },
+  { title:'2. Tool Sprawl Detection Logic', code:
+`def detect_overlaps(tool_inventory: dict) -> dict:
+    """
+    tool_inventory: { tool_name: {"category": str, "spend": float, "adoption": float, "roi": float} }
+    Returns overlapping categories with a recommended tool to keep.
+    """
+    by_category = {}
+    for name, info in tool_inventory.items():
+        by_category.setdefault(info["category"], []).append({"name": name, **info})
+
+    overlaps = {}
+    for category, tools in by_category.items():
+        if len(tools) <= 1:
+            continue
+        ranked = sorted(tools, key=lambda t: t["adoption"] * 0.6 + t["roi"] * 10 * 0.4, reverse=True)
+        keep, eliminate = ranked[0], ranked[1:]
+        overlaps[category] = {
+            "tool_count": len(tools),
+            "total_cost": sum(t["spend"] for t in tools),
+            "keep": keep["name"],
+            "eliminate": [t["name"] for t in eliminate],
+            "estimated_savings": sum(t["spend"] for t in eliminate) * 0.9,
+        }
+    return overlaps` },
+  { title:'3. Shadow AI Risk Scorer', code:
+`def score_shadow_risk(tool: dict) -> str:
+    """
+    tool: {"has_dpa": bool, "security_reviewed": bool, "data_classification": str}
+    data_classification: one of "public", "internal", "confidential", "restricted"
+    Returns: "Critical" | "Medium" | "Low"
+    """
+    high_sensitivity = tool["data_classification"] in ("confidential", "restricted")
+
+    if not tool["has_dpa"] and not tool["security_reviewed"] and high_sensitivity:
+        return "Critical"
+    if not tool["has_dpa"] or not tool["security_reviewed"]:
+        return "Medium" if high_sensitivity else "Low"
+    return "Low"` }
+];
+const codeBlocksEl = document.getElementById('codeBlocks');
+CODE_SECTIONS.forEach((section, idx)=>{
+  const wrapper = document.createElement('div');
+  wrapper.className = 'code-block';
+  wrapper.innerHTML = `
+    <div class="code-header">
+      <h4 class="font-semibold text-sm">${section.title}</h4>
+      <button class="copy-btn" data-idx="${idx}">📋 Copy</button>
+    </div>
+    <pre><code class="language-python" id="code-${idx}"></code></pre>
+  `;
+  codeBlocksEl.appendChild(wrapper);
+  document.getElementById('code-'+idx).textContent = section.code;
+});
+if(window.Prism) Prism.highlightAll();
+codeBlocksEl.querySelectorAll('.copy-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const idx = btn.dataset.idx;
+    navigator.clipboard.writeText(CODE_SECTIONS[idx].code).then(()=>{
+      btn.textContent = '✅ Copied';
+      btn.classList.add('copied');
+      setTimeout(()=>{ btn.textContent = '📋 Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+});
+
+/* ---------- 22. INITIAL LOAD ---------- */
+readProfileFromDOM();
+updateFloatingWaste();
+renderRoiCalculator();
+state.metrics = computeMetrics(state.profile);
+renderHeroStats();
+renderBubbleChart();
+renderToolTable();
+renderFatigueGauge();
+renderBenchmarkBars();
+renderQuickWin();
+renderOverlapGrid();
+renderShadowTable();
+renderConsolidationSummary();
+renderBoardReport();
+</script>
+</body>
+</html>

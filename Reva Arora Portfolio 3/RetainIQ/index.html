@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RetainIQ — Employee Turnover Cost & Retention ROI Calculator</title>
+<meta name="description" content="RetainIQ quantifies the true financial cost of employee turnover and simulates the ROI of retention interventions." />
+<link rel="stylesheet" href="styles.css" />
+<!-- Chart.js loaded from a stable CDN. This is just a script tag reference in the browser -- nothing is installed on your computer. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ======================= STICKY HEADER ======================= -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-mark">R</span>
+        <div class="brand-text">
+          <h1>RetainIQ</h1>
+          <p>Employee Turnover Cost &amp; Retention ROI Calculator</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-export-summary" class="btn btn-ghost">Export Summary</button>
+        <button id="btn-copy-findings" class="btn btn-ghost">Copy Findings</button>
+        <span class="badge badge-github">⌁ GitHub Pages Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ======================= POSITIONING STRIP ======================= -->
+    <div class="positioning-strip">
+      <p><strong>This is not an attrition prediction demo.</strong> RetainIQ is a retention decision-support product that quantifies turnover cost and intervention ROI so leaders can decide where to spend, not just what to predict.</p>
+    </div>
+
+    <!-- ======================= HERO INSIGHT BAND ======================= -->
+    <section class="hero" aria-label="Key insight summary">
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-berry">
+          <span class="kpi-label">Annual Turnover Cost</span>
+          <span class="kpi-value" id="kpi-turnover-cost">$0</span>
+          <span class="kpi-sub" id="kpi-turnover-cost-sub">across all departments</span>
+        </div>
+        <div class="kpi-card kpi-tangerine">
+          <span class="kpi-label">Attrition Rate</span>
+          <span class="kpi-value" id="kpi-attrition-rate">0%</span>
+          <span class="kpi-sub" id="kpi-attrition-rate-sub">0 employees / year</span>
+        </div>
+        <div class="kpi-card kpi-honey">
+          <span class="kpi-label">High-Risk Segments</span>
+          <span class="kpi-value" id="kpi-risk-segments">0</span>
+          <span class="kpi-sub" id="kpi-risk-segments-sub">department × tenure cells flagged</span>
+        </div>
+        <div class="kpi-card kpi-lime">
+          <span class="kpi-label">Est. ROI from Retention Plan</span>
+          <span class="kpi-value" id="kpi-roi">0%</span>
+          <span class="kpi-sub" id="kpi-roi-sub">payback in 0 months</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= WORKFORCE CONFIGURATOR ======================= -->
+    <section class="configurator" aria-label="Workforce configurator">
+      <div class="section-heading">
+        <h2>Workforce Configurator</h2>
+        <p>Tell us about your organization. Every number below drives the models in every tab.</p>
+      </div>
+
+      <div class="configurator-grid">
+        <div class="field">
+          <label for="input-industry">Industry</label>
+          <select id="input-industry">
+            <option value="technology">Technology</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="retail">Retail</option>
+            <option value="manufacturing">Manufacturing</option>
+            <option value="finance">Finance</option>
+            <option value="hospitality">Hospitality</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="input-company-size">Company Size</label>
+          <select id="input-company-size">
+            <option value="startup">Startup (&lt; 100)</option>
+            <option value="smb">SMB (100–500)</option>
+            <option value="midmarket" selected>Mid-Market (500–2,000)</option>
+            <option value="enterprise">Enterprise (2,000+)</option>
+          </select>
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-headcount">Employee Count <span class="field-value" id="val-headcount">1,200</span></label>
+          <input type="range" id="input-headcount" min="50" max="10000" step="50" value="1200" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-attrition">Annual Attrition Rate <span class="field-value" id="val-attrition">18%</span></label>
+          <input type="range" id="input-attrition" min="5" max="40" step="1" value="18" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-salary">Average Salary <span class="field-value" id="val-salary">$78,000</span></label>
+          <input type="range" id="input-salary" min="30000" max="200000" step="1000" value="78000" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-time-to-fill">Avg. Time-to-Fill (days) <span class="field-value" id="val-time-to-fill">45</span></label>
+          <input type="range" id="input-time-to-fill" min="15" max="120" step="1" value="45" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-ramp">Onboarding Ramp (months) <span class="field-value" id="val-ramp">4</span></label>
+          <input type="range" id="input-ramp" min="1" max="12" step="1" value="4" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-high-performers">% High Performers <span class="field-value" id="val-high-performers">15%</span></label>
+          <input type="range" id="input-high-performers" min="5" max="40" step="1" value="15" />
+        </div>
+
+        <div class="field slider-field">
+          <label for="input-manager-roles">% Manager Roles <span class="field-value" id="val-manager-roles">12%</span></label>
+          <input type="range" id="input-manager-roles" min="5" max="30" step="1" value="12" />
+        </div>
+      </div>
+
+      <button id="btn-analyze" class="btn btn-primary btn-large">Analyze Retention Risk</button>
+    </section>
+
+    <!-- ======================= TABS ======================= -->
+    <nav class="tabs" role="tablist" aria-label="RetainIQ report sections">
+      <button class="tab-btn active" data-tab="tab-cost" role="tab" aria-selected="true">Cost Breakdown</button>
+      <button class="tab-btn" data-tab="tab-risk" role="tab" aria-selected="false">Risk Segments</button>
+      <button class="tab-btn" data-tab="tab-intervention" role="tab" aria-selected="false">Intervention Simulator</button>
+      <button class="tab-btn" data-tab="tab-roi" role="tab" aria-selected="false">ROI Board</button>
+      <button class="tab-btn" data-tab="tab-summary" role="tab" aria-selected="false">Executive Summary</button>
+      <button class="tab-btn" data-tab="tab-python" role="tab" aria-selected="false">Python Logic</button>
+      <button class="tab-btn" data-tab="tab-linkedin" role="tab" aria-selected="false">LinkedIn Carousel</button>
+    </nav>
+
+    <div class="tab-panels">
+
+      <!-- ======================= TAB 1: COST BREAKDOWN ======================= -->
+      <section id="tab-cost" class="tab-panel active" role="tabpanel">
+        <div class="panel-grid panel-grid-2">
+          <div class="card chart-card">
+            <h3>Cost Components by Department</h3>
+            <div class="chart-wrap"><canvas id="chart-stacked-cost"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <h3>Direct vs Indirect Turnover Cost</h3>
+            <div class="chart-wrap chart-wrap-small"><canvas id="chart-direct-indirect"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <h3>Savings Opportunity Waterfall</h3>
+          <p class="card-caption">How much of your current turnover cost could be recovered by fully funding each intervention.</p>
+          <div class="chart-wrap"><canvas id="chart-waterfall"></canvas></div>
+        </div>
+
+        <div class="section-heading section-heading-sm">
+          <h3>Top Loss Drivers</h3>
+        </div>
+        <div class="driver-cards" id="driver-cards"></div>
+
+        <div class="card explain-panel">
+          <h3>What's driving this number</h3>
+          <p id="cost-explanation">Run the analysis to see a plain-language breakdown of your turnover cost.</p>
+        </div>
+      </section>
+
+      <!-- ======================= TAB 2: RISK SEGMENTS ======================= -->
+      <section id="tab-risk" class="tab-panel" role="tabpanel">
+        <div class="card">
+          <h3>Turnover Cost Heatmap — Department × Tenure</h3>
+          <p class="card-caption">Darker coral cells indicate higher turnover cost concentration. Click any cell for detail.</p>
+          <div class="heatmap-wrap">
+            <div id="heatmap-grid" class="heatmap-grid"></div>
+          </div>
+        </div>
+
+        <div class="panel-grid panel-grid-2">
+          <div class="card chart-card">
+            <h3>Risk Score vs. Replacement Cost</h3>
+            <p class="card-caption">Bubble size = department headcount.</p>
+            <div class="chart-wrap"><canvas id="chart-bubble"></canvas></div>
+          </div>
+          <div class="card" id="segment-detail-card">
+            <h3>Segment Detail</h3>
+            <div id="segment-detail-body">
+              <p class="muted">Click a heatmap cell or a segment card below to see the breakdown here.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-heading section-heading-sm">
+          <h3>Departments</h3>
+        </div>
+        <div class="segment-cards" id="segment-cards"></div>
+      </section>
+
+      <!-- ======================= TAB 3: INTERVENTION SIMULATOR ======================= -->
+      <section id="tab-intervention" class="tab-panel" role="tabpanel">
+        <div class="card">
+          <h3>Intervention Simulator</h3>
+          <p class="card-caption">Drag each investment level to see estimated cost, attrition reduction, savings, and net impact update live.</p>
+          <div id="intervention-controls" class="intervention-controls"></div>
+        </div>
+
+        <div class="panel-grid panel-grid-2">
+          <div class="card">
+            <h3>Before vs. After</h3>
+            <div id="before-after" class="before-after"></div>
+          </div>
+          <div class="card">
+            <h3>Interventions Ranked by ROI</h3>
+            <div id="intervention-ranking" class="intervention-ranking"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>What-If Scenario Summary</h3>
+          <p id="scenario-summary">Adjust the sliders above to build a scenario.</p>
+        </div>
+      </section>
+
+      <!-- ======================= TAB 4: ROI BOARD ======================= -->
+      <section id="tab-roi" class="tab-panel" role="tabpanel">
+        <div class="banner" id="recommended-plan-banner">
+          <span class="banner-tag">Recommended Plan</span>
+          <p id="recommended-plan-text">Run the analysis to generate your recommended retention plan.</p>
+        </div>
+
+        <div class="panel-grid panel-grid-2">
+          <div class="card chart-card">
+            <h3>Retention ROI</h3>
+            <div class="chart-wrap chart-wrap-gauge"><canvas id="chart-roi-gauge"></canvas></div>
+            <div class="gauge-readout" id="gauge-readout">0%</div>
+          </div>
+          <div class="card chart-card">
+            <h3>12-Month Cumulative Savings Projection</h3>
+            <div class="chart-wrap"><canvas id="chart-projection"></canvas></div>
+          </div>
+        </div>
+
+        <div class="panel-grid panel-grid-3">
+          <div class="card stat-card">
+            <span class="stat-label">Total Investment</span>
+            <span class="stat-value" id="roi-investment">$0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Annual Savings</span>
+            <span class="stat-value" id="roi-savings">$0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Payback Period</span>
+            <span class="stat-value" id="roi-payback">0 months</span>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <h3>Budget vs. Benefit by Intervention</h3>
+          <div class="chart-wrap"><canvas id="chart-budget-benefit"></canvas></div>
+        </div>
+
+        <div class="card board-summary" id="board-summary-card">
+          <div class="board-summary-header">
+            <h3>Board-Style Summary</h3>
+            <button id="btn-download-board" class="btn btn-secondary">Download Summary</button>
+          </div>
+          <div id="board-summary-body"></div>
+        </div>
+      </section>
+
+      <!-- ======================= TAB 5: EXECUTIVE SUMMARY ======================= -->
+      <section id="tab-summary" class="tab-panel" role="tabpanel">
+        <div class="card summary-card">
+          <div class="board-summary-header">
+            <h3>Executive Summary</h3>
+            <div class="header-actions">
+              <button id="btn-copy-summary" class="btn btn-ghost">Copy Summary</button>
+              <button id="btn-export-txt" class="btn btn-secondary">Export TXT</button>
+            </div>
+          </div>
+          <div id="executive-summary-body" class="exec-summary-body"></div>
+        </div>
+      </section>
+
+      <!-- ======================= TAB 6: PYTHON LOGIC ======================= -->
+      <section id="tab-python" class="tab-panel" role="tabpanel">
+        <div class="card code-card">
+          <div class="code-card-header">
+            <h3>Turnover Cost Calculation</h3>
+            <button class="btn btn-ghost btn-copy-code" data-target="code-turnover-cost">Copy</button>
+          </div>
+          <pre><code id="code-turnover-cost" class="language-python"># Estimates the fully-loaded cost of a single departing employee
+def turnover_cost_per_exit(salary, time_to_fill_days, ramp_months, criticality):
+    replacement_cost   = salary * 0.20                                   # agency + advertising + admin
+    recruiter_cost     = salary * 0.10                                   # internal recruiter time
+    manager_time_cost  = (salary / 2080) * 15 * 2                        # hourly rate * interview hours * interviewers
+    onboarding_cost    = salary * (ramp_months / 12) * 0.50              # training + ramp materials
+    productivity_loss  = salary * (ramp_months / 12) * criticality       # ramp-up inefficiency + team drag
+    vacancy_cost       = (salary / 260) * time_to_fill_days * 0.60       # lost output while seat is empty
+
+    return {
+        "replacement": replacement_cost,
+        "recruiter": recruiter_cost,
+        "manager_time": manager_time_cost,
+        "onboarding": onboarding_cost,
+        "productivity_loss": productivity_loss,
+        "vacancy": vacancy_cost,
+        "total": (replacement_cost + recruiter_cost + manager_time_cost
+                  + onboarding_cost + productivity_loss + vacancy_cost),
+    }</code></pre>
+        </div>
+
+        <div class="card code-card">
+          <div class="code-card-header">
+            <h3>Segment Risk Scoring</h3>
+            <button class="btn btn-ghost btn-copy-code" data-target="code-segment-risk">Copy</button>
+          </div>
+          <pre><code id="code-segment-risk" class="language-python"># Scores a department x tenure-band segment on turnover cost concentration
+def segment_risk_cost(dept_exits, tenure_share, tenure_risk_mult, cost_per_exit):
+    # tenure_share: fraction of exits that fall inside this tenure band
+    # tenure_risk_mult: early-tenure bands carry more onboarding/ramp risk
+    return dept_exits * tenure_share * tenure_risk_mult * cost_per_exit
+
+
+def attrition_risk_score(attrition_multiplier, tenure_risk_weighted, max_score=100):
+    # Normalizes a department's relative flight risk onto a 0-100 scale
+    raw_score = attrition_multiplier * tenure_risk_weighted
+    return min(max_score, round(raw_score * 40))</code></pre>
+        </div>
+
+        <div class="card code-card">
+          <div class="code-card-header">
+            <h3>Intervention ROI Formula</h3>
+            <button class="btn btn-ghost btn-copy-code" data-target="code-roi">Copy</button>
+          </div>
+          <pre><code id="code-roi" class="language-python"># Converts an investment level (0-100%) into cost, exits avoided, and ROI
+def simulate_intervention(level_pct, employees_targeted, avg_salary,
+                           cost_factor, max_attrition_reduction,
+                           baseline_exits, avg_cost_per_exit):
+    level = level_pct / 100
+
+    implementation_cost = cost_factor * employees_targeted * avg_salary * level
+    attrition_reduction = max_attrition_reduction * level          # diminishing returns can be layered in
+    exits_avoided = baseline_exits * attrition_reduction
+    savings = exits_avoided * avg_cost_per_exit
+
+    net_impact = savings - implementation_cost
+    roi_pct = (net_impact / implementation_cost * 100) if implementation_cost > 0 else 0
+
+    return {
+        "cost": implementation_cost,
+        "exits_avoided": exits_avoided,
+        "savings": savings,
+        "net_impact": net_impact,
+        "roi_pct": roi_pct,
+    }</code></pre>
+        </div>
+      </section>
+
+      <!-- ======================= TAB 7: LINKEDIN CAROUSEL ======================= -->
+      <section id="tab-linkedin" class="tab-panel" role="tabpanel">
+        <div class="carousel-grid" id="carousel-grid"></div>
+
+        <div class="card">
+          <div class="board-summary-header">
+            <h3>Ready-to-Copy LinkedIn Caption</h3>
+            <button id="btn-copy-caption" class="btn btn-ghost">Copy Caption</button>
+          </div>
+          <p id="linkedin-caption" class="linkedin-caption"></p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>RetainIQ — built with vanilla HTML, CSS &amp; JavaScript + Chart.js. No backend. No tracking. Runs entirely in your browser.</p>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
